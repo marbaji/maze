@@ -1,0 +1,21 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Key adapter tests
+        run: node tests/byok.test.cjs
+      - name: Rebuild matches the committed page
+        run: bash tests/rebuild-check.sh
+      - name: Privacy scan
+        run: python3 tests/privacy-scan.py
