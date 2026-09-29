@@ -159,6 +159,7 @@ t('8 sse error event', async () => {
   const errEv = (type) => start + textStart + textDelta('so far') + ev('error', { type: 'error', error: { type, message: 'boom' } });
   await rejects(run([errEv('overloaded_error')]), 'upstream_error', (e) => assert.strictEqual(e.text, 'so far'));
   await rejects(run([errEv('rate_limit_error')]), 'rate_limited');
+  await rejects(run([errEv('not_found_error')]), 'permission');   // the type alone, with no HTTP status behind it
 });
 
 t('9 network failure', async () => {
