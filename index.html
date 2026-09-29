@@ -273,11 +273,11 @@ figure.panel{padding:18px 18px 14px}
         <p id="keystate" class="note" hidden>Key in use: <span id="keymasked"></span> <button id="forgetkey" type="button">Forget key</button></p>
         <p id="keyerr" class="note" role="alert" hidden></p>
         <details id="keyguide"><summary>How to get a key (2 minutes)</summary>
-          <ol><li>Open platform.claude.com/settings/keys and sign in or create an account.</li>
+          <ol><li>Open <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a> and sign in or create an account.</li>
           <li>If it asks, add a few dollars of credit. Leave automatic top-up off.</li>
           <li>Click Create key and set it to expire in 3 hours.</li>
           <li>Copy the key and paste it above.</li></ol>
-          <p>The key stays in this tab and is forgotten when you close it. The page sends it only to Anthropic; the code is at github.com/marbaji/maze.</p>
+          <p>The key stays in this tab until you close the tab or press Forget key. The page sends it only to Anthropic; the code is at <a href="https://github.com/marbaji/maze#how-your-api-key-is-handled" target="_blank" rel="noopener">github.com/marbaji/maze</a>.</p>
         </details>
       </div>
     </div>
@@ -305,11 +305,11 @@ figure.panel{padding:18px 18px 14px}
   const maskKey = s => '····' + clean(s).slice(-4);
   const fail = (code, message, text) => (text ? { code, message, text } : { code, message });
   const TYPE_CODE = { authentication_error: 'bad_key', permission_error: 'permission', billing_error: 'no_credit',
-    rate_limit_error: 'rate_limited', overloaded_error: 'upstream_error', api_error: 'upstream_error', timeout_error: 'upstream_error' };
+    not_found_error: 'permission', rate_limit_error: 'rate_limited', overloaded_error: 'upstream_error', api_error: 'upstream_error', timeout_error: 'upstream_error' };
   function codeFor(type, status, message) {
     if (type === 'invalid_request_error' || (!type && status === 400)) return /credit balance/i.test(message || '') ? 'no_credit' : 'invalid_request';
     if (TYPE_CODE[type]) return TYPE_CODE[type];
-    if (status === 401) return 'bad_key'; if (status === 403) return 'permission'; if (status === 429) return 'rate_limited';
+    if (status === 401) return 'bad_key'; if (status === 402) return 'no_credit'; if (status === 403 || status === 404) return 'permission'; if (status === 429) return 'rate_limited';
     if (status >= 500) return 'upstream_error'; return 'invalid_request';
   }
   function parseSSE() { // WHATWG event-stream: CR, LF or CRLF line ends; 'field:value' with one optional leading space; multi-line data joined by '\n'
@@ -323,6 +323,7 @@ figure.panel{padding:18px 18px 14px}
     };
     return {
       push(s) {
+        if (!s) return out.splice(0); // an empty chunk says nothing about a CR the last chunk ended on
         if (pendingCR && s[0] === '\n') s = s.slice(1); pendingCR = false;
         buf += s; let m;
         while ((m = /\r\n|\r|\n/.exec(buf))) {
@@ -348,6 +349,7 @@ figure.panel{padding:18px 18px 14px}
       } catch (e) { throw (sig && sig.aborted) ? fail('cancelled', 'Stopped.') : fail('upstream_error', 'Could not reach Anthropic.'); }
       if (!res.ok) { let t = '', m = ''; try { const j = await res.json(); t = j.error.type; m = j.error.message; } catch (e) {}
         throw fail(codeFor(t, res.status, m), m || ('HTTP ' + res.status)); }
+      if (!res.body) throw fail('upstream_error', 'The answer arrived empty.');
       const reader = res.body.getReader(), dec = new TextDecoder(), sse = parseSSE();
       let text = '', stop = null, done = false, started = false;
       const handle = e => {
@@ -365,13 +367,13 @@ figure.panel{padding:18px 18px 14px}
           if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text);
           const { value, done: eof } = await reader.read();
           if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text); // checked after every await, before EOF is classified
-          if (eof) { sse.push(dec.decode()); sse.end(); break; }
+          if (eof) { for (const e of sse.push(dec.decode()).concat(sse.end())) handle(e); break; }
           for (const e of sse.push(dec.decode(value, { stream: true }))) handle(e);
         }
       } catch (e) {
         try { await reader.cancel(); } catch (x) {} // cancel() returns a promise that rejects on an errored body
         if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text);
-        if (e && e.code) throw e; throw fail('upstream_error', 'The answer stopped early.', text);
+        if (e && typeof e.code === 'string') throw e; throw fail('upstream_error', 'The answer stopped early.', text); // the adapter's own errors carry a string code; a DOMException's code is a number
       }
       if (!done || !started || !stop) throw fail('upstream_error', 'The answer stopped early.', text);
       if (!text && stop === 'end_turn') throw fail('empty_completion', 'Claude sent an empty answer.');
@@ -2091,7 +2093,7 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look
     if(asking) send.dataset.off='1'; else delete send.dataset.off;
     send.disabled=busy||!!send.dataset.off;
     $('capnote').textContent=k?'':ASK_MSG;
-    showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so off claude.ai their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
+    showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so with a reader's key their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
   function init(claudeSample){ if(claudeSample){ hosted=true; sync(); return claudeSample; }
     const k=stored(); sampleNs=k?MazeByok.makeKeySample({key:k}):null; sync(); return sampleNs; }
   function save(raw){ const k=String(raw||'').trim();
@@ -2287,7 +2289,8 @@ async function enforce(src, say, how, ctx, pre){
       if(a.err){ logLine('think','the judge (Opus) gave no answer ('+a.err+'). asking it once more\u2026'); a=await askJudge(); if(gone()) return {done:true,gone:true}; }
       if(a.err) silent=a.err; else verdict=a.v; }
     if(silent){ logLine('no','the judge (Opus) did not answer ('+silent+'), so the change was not applied.'+stands); return reject('the judge did not answer ('+silent+'); nothing was judged, so the change was not applied', 'The judge did not answer ('+silent+'), so nothing was judged and the change was not applied.', 'judge'); }
-    const saidWinnable=!!(verdict&&verdict.winnable); const reason=String(verdict ? (verdict.reason||'(no reason given)') : 'no viewer, so no judge; the change was let through unjudged').slice(0,240);
+    if(!verdict){ logLine('ok',"no judge ran: there is no API key, so the change was let through unjudged. paste an Anthropic API key in the Ask tab to have the judge read each change."); return acceptOffer(how+' '+"No judge ran, because there is no API key, so the change was let through unjudged.", how+' '+"No judge ran, because there is no API key, so the change was let through unjudged."); }   // no key, so no judge ran: say so, never as a verdict
+    const saidWinnable=!!verdict.winnable; const reason=String(verdict.reason||'(no reason given)').slice(0,240);
     if(saidWinnable){ logLine('no','judge: rejected this program. it said the game can be won: "'+reason+'".'+(pv.unwinnable?' (the judge was wrong: the page knows no win exists.)':'')+stands); return reject('the judge said the game can be won: '+reason, 'The judge said winnable: "'+reason+'". Rejected.', 'judge'); }
     logLine('ok','judge: passed. it said the game cannot be won: "'+reason+'".'+(pv.known?' (the judge was wrong: the page knows a win exists.)':'')); return acceptOffer(how+' The judge read it and said not winnable: "'+reason+'".', how+' The judge read it and said not winnable: "'+reason+'". The judge is a model reading the program and the writer\'s note, so it can misread a program, and nothing checks its answer.'); }
   if(mode==='proof'){
@@ -2328,7 +2331,7 @@ async function request(userMsg, opts){
       caught(L.src); lastSay=L.say||''; }
     if(opts.gate){ // Prose: the sentence-gate, the runner's first phase
       status.textContent='asking the AI whether to apply it\u2026'; logLine('think','asking Opus whether to apply it. the only thing in its way is one sentence.');
-      if(!sampleNs){ now.why='Prose needs the AI, and this viewer has none. Nothing applied.'; quizState='ask'; renderCard(); return; }
+      if(!sampleNs){ now.why="Prose needs the AI, which runs once you paste an Anthropic API key in the Ask tab. Nothing applied."; quizState='ask'; renderCard(); return; }
       costNote('ask'); let g=null, noAnswer='';
       { try{ g=await timedCall(signal=>sampleNs.json(proseGatePrompt(opts.gate), { signal, cache:false, modelTier:'complex' }), judgeMs()); }
         catch(e){ if(e&&(e.code==='cancelled'||GATE_PASS.includes(e.code))) throw e; noAnswer=gateReason(e&&e.code); } }
@@ -2343,8 +2346,8 @@ async function request(userMsg, opts){
       const r=await enforce(c.src, c.say||'', c.how, ctx(true, {whyLine:c.why, from:'page'})); if(gone()||r.gone) return;
       if(r.done) return; lastSay=c.say||''; if(after(r, c.src, aiRounds, pre.slice(i+1), 0)) return; }
     if(!aiRounds&&!mine.length){ quizState='ask'; renderCard(); return; }
-    if(!aiRounds){ logLine('no','six programs in a row were caught. the game is unchanged and the rule is still standing. ask the AI for 6 more programs, or leave it: your call.'); now.say=lastSay; now.why='Six programs in a row were caught. The game is unchanged and the rule is still standing. Asking the AI for 6 more programs runs six more rounds with everything tried so far; each round is one call on your claude.ai account, about half a minute.'; pause(); return; }
-    if(!sampleNs){ now.why+=(pre.length?' The page\u2019s own repaired version was rejected too, and this viewer has no AI to go on with.':' This viewer has no AI.')+' Open the page in the claude.ai app and the AI keeps the request and finds another way to hold the rule.'; quizState='ask'; renderCard(); return; }
+    if(!aiRounds){ logLine('no','six programs in a row were caught. the game is unchanged and the rule is still standing. ask the AI for 6 more programs, or leave it: your call.'); now.say=lastSay; now.why='Six programs in a row were caught. The game is unchanged and the rule is still standing. Asking the AI for 6 more programs runs six more rounds with everything tried so far; each round is one call on your API key, about half a minute.'; pause(); return; }
+    if(!sampleNs){ now.why+=(pre.length?' The page\u2019s own repaired version was rejected too, and the AI needs a key to go on.':' The AI needs a key to go on.')+' Paste an Anthropic API key in the Ask tab and the AI keeps the request and finds another way to hold the rule.'; quizState='ask'; renderCard(); return; }
     for(let round=1; round<=aiRounds; round++){ if(gone()) return;
       const repairing=mine.length>0; const label=(round0+round)+' of '+(round0+aiRounds);
       status.textContent = !repairing ? 'asking the AI to write the game\u2026' : 'caught. the AI is rewriting ('+label+')\u2026';
@@ -2369,7 +2372,7 @@ async function request(userMsg, opts){
       if(after(r, src, aiRounds-round, [], round)) return;
     }
     logLine('no','six programs in a row were caught. the game is unchanged and the rule is still standing. ask the AI for 6 more programs, or leave it: your call.');
-    now.say=lastSay; now.why='Six programs in a row were caught. The game is unchanged and the rule is still standing. Asking the AI for 6 more programs runs six more rounds with everything tried so far; each round is one call on your claude.ai account, about half a minute.'; pause();
+    now.say=lastSay; now.why='Six programs in a row were caught. The game is unchanged and the rule is still standing. Asking the AI for 6 more programs runs six more rounds with everything tried so far; each round is one call on your API key, about half a minute.'; pause();
   }catch(e){
     if(gone()) return;
     if(e&&e.code==='cancelled'){ logLine('no','stopped.'); now.why='Stopped. The game is unchanged.'; renderCard(); }

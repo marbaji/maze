@@ -5,11 +5,11 @@
   const maskKey = s => '····' + clean(s).slice(-4);
   const fail = (code, message, text) => (text ? { code, message, text } : { code, message });
   const TYPE_CODE = { authentication_error: 'bad_key', permission_error: 'permission', billing_error: 'no_credit',
-    rate_limit_error: 'rate_limited', overloaded_error: 'upstream_error', api_error: 'upstream_error', timeout_error: 'upstream_error' };
+    not_found_error: 'permission', rate_limit_error: 'rate_limited', overloaded_error: 'upstream_error', api_error: 'upstream_error', timeout_error: 'upstream_error' };
   function codeFor(type, status, message) {
     if (type === 'invalid_request_error' || (!type && status === 400)) return /credit balance/i.test(message || '') ? 'no_credit' : 'invalid_request';
     if (TYPE_CODE[type]) return TYPE_CODE[type];
-    if (status === 401) return 'bad_key'; if (status === 403) return 'permission'; if (status === 429) return 'rate_limited';
+    if (status === 401) return 'bad_key'; if (status === 402) return 'no_credit'; if (status === 403 || status === 404) return 'permission'; if (status === 429) return 'rate_limited';
     if (status >= 500) return 'upstream_error'; return 'invalid_request';
   }
   function parseSSE() { // WHATWG event-stream: CR, LF or CRLF line ends; 'field:value' with one optional leading space; multi-line data joined by '\n'
@@ -23,6 +23,7 @@
     };
     return {
       push(s) {
+        if (!s) return out.splice(0); // an empty chunk says nothing about a CR the last chunk ended on
         if (pendingCR && s[0] === '\n') s = s.slice(1); pendingCR = false;
         buf += s; let m;
         while ((m = /\r\n|\r|\n/.exec(buf))) {
@@ -48,6 +49,7 @@
       } catch (e) { throw (sig && sig.aborted) ? fail('cancelled', 'Stopped.') : fail('upstream_error', 'Could not reach Anthropic.'); }
       if (!res.ok) { let t = '', m = ''; try { const j = await res.json(); t = j.error.type; m = j.error.message; } catch (e) {}
         throw fail(codeFor(t, res.status, m), m || ('HTTP ' + res.status)); }
+      if (!res.body) throw fail('upstream_error', 'The answer arrived empty.');
       const reader = res.body.getReader(), dec = new TextDecoder(), sse = parseSSE();
       let text = '', stop = null, done = false, started = false;
       const handle = e => {
@@ -65,13 +67,13 @@
           if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text);
           const { value, done: eof } = await reader.read();
           if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text); // checked after every await, before EOF is classified
-          if (eof) { sse.push(dec.decode()); sse.end(); break; }
+          if (eof) { for (const e of sse.push(dec.decode()).concat(sse.end())) handle(e); break; }
           for (const e of sse.push(dec.decode(value, { stream: true }))) handle(e);
         }
       } catch (e) {
         try { await reader.cancel(); } catch (x) {} // cancel() returns a promise that rejects on an errored body
         if (sig && sig.aborted) throw fail('cancelled', 'Stopped.', text);
-        if (e && e.code) throw e; throw fail('upstream_error', 'The answer stopped early.', text);
+        if (e && typeof e.code === 'string') throw e; throw fail('upstream_error', 'The answer stopped early.', text); // the adapter's own errors carry a string code; a DOMException's code is a number
       }
       if (!done || !started || !stop) throw fail('upstream_error', 'The answer stopped early.', text);
       if (!text && stop === 'end_turn') throw fail('empty_completion', 'Claude sent an empty answer.');

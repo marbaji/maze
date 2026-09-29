@@ -47,6 +47,7 @@ async function structure(page, width) {
       forgetText: document.getElementById('forgetkey') ? document.getElementById('forgetkey').textContent : null,
       maskedTag: masked ? masked.tagName : null, maskedOnclick: masked ? masked.hasAttribute('onclick') : null,
       bodyText: document.body.innerText,
+      guideLinks: [...document.querySelectorAll('#keyguide a[href]')].map((a) => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') })),
       cspCount: csp.length, cspContent: csp[0] ? csp[0].getAttribute('content') : null, cspInHead: csp[0] ? document.head.contains(csp[0]) : false,
       offOrigin: off,
       scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth,
@@ -65,6 +66,11 @@ async function structure(page, width) {
   check(s.forgetText === 'Forget key', `#forgetkey text ${JSON.stringify(s.forgetText)}` + at);
   check(s.maskedTag === 'SPAN' && s.maskedOnclick === false, `#keymasked is ${s.maskedTag}, onclick attribute ${s.maskedOnclick}` + at);
   for (const bad of ['claude.ai viewer', 'Claude cannot answer on this page']) check(!s.bodyText.includes(bad), `visible text contains "${bad}"` + at);
+  check(!s.bodyText.includes('claude.ai'), 'visible text contains "claude.ai"' + at);
+  for (const want of ['https://platform.claude.com/settings/keys', 'https://github.com/marbaji/maze#how-your-api-key-is-handled']) {
+    const l = s.guideLinks.find((x) => x.href === want);
+    check(l && l.target === '_blank' && l.rel === 'noopener', `key guide link ${want}: ${JSON.stringify(l || 'missing')}` + at);
+  }
   check(s.cspCount === 1, `CSP meta count ${s.cspCount}` + at);
   check(s.cspContent === CSP, `CSP content differs: ${JSON.stringify(s.cspContent)}` + at);
   check(s.cspInHead, 'CSP meta is not in the document head' + at);

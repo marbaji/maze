@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -19,3 +22,23 @@ jobs:
         run: bash tests/rebuild-check.sh
       - name: Privacy scan
         run: python3 tests/privacy-scan.py
+      - name: Importer check
+        run: python3 tests/import-check.py
+      - name: README line links
+        run: python3 tests/readme-links-check.py
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.64.0-alpha-1790635538000
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Play page structure
+        run: node tests/play-page-check.cjs index.html
+      - name: Play page behaviour
+        run: node tests/play-behaviour.cjs

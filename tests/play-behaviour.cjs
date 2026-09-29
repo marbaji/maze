@@ -2,10 +2,12 @@
 // Behaviour tests of the play page (index.html), with no real key and without ?mock.
 //   node tests/play-behaviour.cjs
 // Two transports: page.route() fulfils complete Anthropic answers; a small Node streaming server on 127.0.0.1:8766 holds a stream open
-// (Stop, Forget, timeouts). The streaming cases load a TEST COPY of index.html written next to it, with the adapter's API constant, the CSP
-// connect-src and the judge timeout pointed at the test; the shipped page is never changed and has no URL override.
+// (Stop, Forget, timeouts). The streaming cases load a TEST COPY of index.html, with the adapter's API constant, the CSP connect-src and the
+// judge timeout pointed at the test; the shipped page is never changed and has no URL override. The static server serves a temporary folder
+// that links to the repo's files and holds the copy, so the harness never writes into the repo.
 // PLAYWRIGHT_PATH (optional) points at a playwright install; CHROME (optional) at a Chromium binary; PYTHON (optional) at python3.
 const fs = require('fs');
+const os = require('os');
 const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -16,7 +18,7 @@ const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const SPORT = 8766, SORIGIN = `http://127.0.0.1:${SPORT}`;
 const API = 'https://api.anthropic.com/v1/messages', SAPI = `${SORIGIN}/v1/messages`;
 const COPY = '.play-stream-copy.html';
-const COPY_JUDGE_MS = 4000;
+const COPY_JUDGE_MS = 8000;   // a CI runner is slower than a laptop: Stop and Forget are given 3 s to act, well inside this
 const KEY = 'sk-ant-api03-testQNoA', KEY2 = 'sk-ant-api03-testN3W1';   // fake, short: never a real key
 const ASK_MSG = 'To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.';
 const BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.";
@@ -90,7 +92,13 @@ function writeCopy() {
   swap(`const API = '${API}'`, `const API = '${SAPI}'`);
   swap('connect-src https://api.anthropic.com"', `connect-src ${SORIGIN}"`);
   swap('const JUDGE_MS=120000;', `const JUDGE_MS=${COPY_JUDGE_MS};`);
-  fs.writeFileSync(path.join(ROOT, COPY), t);
+  fs.writeFileSync(path.join(SERVE, COPY), t);
+}
+// the folder the static server serves: a link to each top-level repo entry, plus the test copy
+let SERVE = null;
+function makeServeDir() {
+  SERVE = fs.mkdtempSync(path.join(os.tmpdir(), 'maze-play-'));
+  for (const name of fs.readdirSync(ROOT)) if (name !== '.git' && name !== COPY) fs.symlinkSync(path.join(ROOT, name), path.join(SERVE, name));
 }
 
 let browser;
@@ -324,9 +332,9 @@ async function case7() {
       if (how === 'canned') await page.click('#tabFree');   // Stop and the key box live on the Ask tab
       await page.click(action === 'stop' ? '#stop' : '#forgetkey');
       // well inside the copy's judge timeout (COPY_JUDGE_MS), so only Stop or Forget can have aborted it
-      await until(() => aborted(failed), 1500, at).catch(() => {});
+      await until(() => aborted(failed), 3000, at).catch(() => {});
       check(aborted(failed), `${at}: the request was not aborted`);
-      await until(() => rec.closed, 1500, at + ' server close').catch(() => {});
+      await until(() => rec.closed, 3000, at + ' server close').catch(() => {});
       check(rec.closed, `${at}: the server still holds the connection`);
       await idle(page);
       const s = await state(page);
@@ -457,6 +465,29 @@ async function case8() {
   await context.close();
 }
 
+async function case10() {
+  // no key: canned changes under Code (proof), Judge and Prose; no card names claude.ai, and where the AI was needed the card sends the reader to the key box
+  const cards = {};
+  for (const mode of ['Code (proof)', 'Judge', 'Prose']) {
+    routed = [];
+    const { context, page } = await open({ name: `case 10 ${mode}` });
+    if (mode !== 'Code (proof)') await setMode(page, mode);
+    await canned(page, 0);
+    await idle(page);
+    const s = await state(page);
+    cards[mode] = s.card;
+    check(!/claude\.ai/i.test(s.card) && !/claude\.ai/i.test(s.log), `case 10 (${mode}): the card or log names claude.ai:\n${s.card}`);
+    check(!/viewer/i.test(s.card), `case 10 (${mode}): the card mentions a viewer:\n${s.card}`);
+    check(routed.length === 0, `case 10 (${mode}): an Anthropic request was made with no key`);
+    await context.close();
+  }
+  check(/caught/.test(cards['Code (proof)']) && /RULE HELD/.test(cards['Code (proof)']), 'case 10 (Code (proof)): premise: the canned change was not caught:\n' + cards['Code (proof)']);
+  const j = cards.Judge;
+  check(/No judge ran/.test(j) && /no API key/.test(j) && /unjudged/.test(j), 'case 10 (Judge): the card does not say no judge ran for want of a key:\n' + j);
+  check(!/The judge read it|said not winnable|said winnable/.test(j), 'case 10 (Judge): the card reads as if the judge ruled:\n' + j);
+  check(/Anthropic API key/.test(cards.Prose) && /Ask tab/.test(cards.Prose), 'case 10 (Prose): the card does not send the reader to the key box:\n' + cards.Prose);
+}
+
 async function case9() {
   const keys = [KEY, KEY2];
   let apiSeen = 0;
@@ -479,7 +510,8 @@ async function case9() {
 }
 
 (async () => {
-  const server = spawn(process.env.PYTHON || 'python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: ROOT, stdio: 'ignore' });
+  makeServeDir();
+  const server = spawn(process.env.PYTHON || 'python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], { cwd: SERVE, stdio: 'ignore' });
   let srv;
   try {
     writeCopy();
@@ -487,7 +519,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/index.html')).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;
@@ -500,7 +532,7 @@ async function case9() {
     if (browser) await browser.close();
     if (srv) { for (const r of stream.reqs) { try { r.res.destroy(); } catch (e) {} } srv.close(); }
     server.kill();
-    try { fs.unlinkSync(path.join(ROOT, COPY)); } catch (e) {}
+    try { fs.rmSync(SERVE, { recursive: true, force: true }); } catch (e) {}
   }
   if (failures.length) { console.log('FAILED play-behaviour\n  ' + failures.join('\n  ')); process.exit(1); }
   console.log('OK play-behaviour');

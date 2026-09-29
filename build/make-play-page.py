@@ -25,6 +25,13 @@ ASK_MSG = ("To use Ask anything, paste an Anthropic API key below. It stays in y
            "sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.")
 BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-."
 
+NEEDS_KEY_PROSE = "Prose needs the AI, which runs once you paste an Anthropic API key in the Ask tab. Nothing applied."
+NO_JUDGE_CARD = "No judge ran, because there is no API key, so the change was let through unjudged."
+NO_JUDGE_LOG = "no judge ran: there is no API key, so the change was let through unjudged. paste an Anthropic API key in the Ask tab to have the judge read each change."
+# the only error texts that name claude.ai: the claude.ai host raises these codes, a reader's own key never does
+HOSTED_ONLY = ("capability_disabled:'This viewer cannot call Claude from a page. Open the page in the claude.ai app.',",
+               "session_expired:'Your claude.ai session expired. Sign in again and ask once more.',")
+
 INTRO = (
     '<h1>The Unwinnable Maze</h1>\n'
     '  <p><b>Welcome to the Unwinnable Maze.</b> You\'ve likely arrived here from '
@@ -38,11 +45,11 @@ KEYBOX = '''
         <p id="keystate" class="note" hidden>Key in use: <span id="keymasked"></span> <button id="forgetkey" type="button">Forget key</button></p>
         <p id="keyerr" class="note" role="alert" hidden></p>
         <details id="keyguide"><summary>How to get a key (2 minutes)</summary>
-          <ol><li>Open platform.claude.com/settings/keys and sign in or create an account.</li>
+          <ol><li>Open <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a> and sign in or create an account.</li>
           <li>If it asks, add a few dollars of credit. Leave automatic top-up off.</li>
           <li>Click Create key and set it to expire in 3 hours.</li>
           <li>Copy the key and paste it above.</li></ol>
-          <p>The key stays in this tab and is forgotten when you close it. The page sends it only to Anthropic; the code is at github.com/marbaji/maze.</p>
+          <p>The key stays in this tab until you close the tab or press Forget key. The page sends it only to Anthropic; the code is at <a href="https://github.com/marbaji/maze#how-your-api-key-is-handled" target="_blank" rel="noopener">github.com/marbaji/maze</a>.</p>
         </details>
       </div>'''
 
@@ -82,7 +89,7 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE=__BAD_SHAPE__, $=i
     if(asking) send.dataset.off='1'; else delete send.dataset.off;
     send.disabled=busy||!!send.dataset.off;
     $('capnote').textContent=k?'':ASK_MSG;
-    showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so off claude.ai their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
+    showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so with a reader's key their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
   function init(claudeSample){ if(claudeSample){ hosted=true; sync(); return claudeSample; }
     const k=stored(); sampleNs=k?MazeByok.makeKeySample({key:k}):null; sync(); return sampleNs; }
   function save(raw){ const k=String(raw||'').trim();
@@ -160,6 +167,19 @@ def main():
     t = rep(t, "const CANNED_WHY='Claude cannot answer on this page for you, so the Canned changes tab is open: ready-made changes that run without it.';",
             "const CANNED_WHY=" + json.dumps(ASK_MSG) + ";", 1, "CANNED_WHY")
 
+    # 4b. every other reader-visible string that assumed the claude.ai viewer now points at the key box
+    t = rep(t, "each round is one call on your claude.ai account, about half a minute.",
+            "each round is one call on your API key, about half a minute.", 2, "round cost")
+    t = rep(t, "now.why='Prose needs the AI, and this viewer has none. Nothing applied.';",
+            "now.why=" + json.dumps(NEEDS_KEY_PROSE) + ";", 1, "Prose without the AI")
+    t = rep(t, "now.why+=(pre.length?' The page\\u2019s own repaired version was rejected too, and this viewer has no AI to go on with.':' This viewer has no AI.')+' Open the page in the claude.ai app and the AI keeps the request and finds another way to hold the rule.';",
+            "now.why+=(pre.length?' The page\\u2019s own repaired version was rejected too, and the AI needs a key to go on.':' The AI needs a key to go on.')+' Paste an Anthropic API key in the Ask tab and the AI keeps the request and finds another way to hold the rule.';",
+            1, "caught without the AI")
+    t = rep(t, "const saidWinnable=!!(verdict&&verdict.winnable); const reason=String(verdict ? (verdict.reason||'(no reason given)') : 'no viewer, so no judge; the change was let through unjudged').slice(0,240);",
+            "if(!verdict){ logLine('ok',"+ json.dumps(NO_JUDGE_LOG) + "); return acceptOffer(how+' '+" + json.dumps(NO_JUDGE_CARD) + ", how+' '+" + json.dumps(NO_JUDGE_CARD) + "); }   // no key, so no judge ran: say so, never as a verdict\n"
+            "    const saidWinnable=!!verdict.winnable; const reason=String(verdict.reason||'(no reason given)').slice(0,240);",
+            1, "Judge without a key")
+
     # 5. the key box under the capnote
     t = rep(t, '<div class="note" id="capnote"></div>', '<div class="note" id="capnote"></div>' + KEYBOX, 1, "capnote div")
 
@@ -215,9 +235,19 @@ def main():
     # controller ruling: the bug-report link points at the public repo
     t = rep(t, "const BUG_REPO='https://github.com/marbaji/unwinnable-maze';", "const BUG_REPO='https://github.com/marbaji/maze';", 1, "BUG_REPO")
 
-    for s in ("claude.ai viewer", "Claude cannot answer on this page"):
+    for s in ("claude.ai viewer", "Claude cannot answer on this page", "this viewer has", "no viewer, so no judge"):
         if s in t:
             fail(f"{s!r} is still in the page")
+    # claude.ai may appear only in the two error texts that only the claude.ai-hosted page can raise; anywhere else
+    # (strings, markup, and comments too, since the build cannot tell them apart reliably) fails the build
+    rest = t
+    for s in HOSTED_ONLY:
+        if rest.count(s) != 1:
+            fail(f"hosted-only text {s!r}: expected 1 match, found {rest.count(s)}")
+        rest = rest.replace(s, "")
+    if "claude.ai" in rest:
+        k = rest.index("claude.ai")
+        fail(f"'claude.ai' outside the claude.ai-hosted error texts: ...{rest[max(0, k - 80):k + 40]!r}...")
     out.write_text(t, encoding="utf-8")
     print(f"wrote {out}")
 

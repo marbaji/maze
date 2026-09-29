@@ -6,7 +6,7 @@ Play at https://artifacts.mohannadarbaji.com/maze/
 
 ## How your API key is handled
 
-The "Ask anything" feature needs an Anthropic API key that you paste in yourself. The page trims the key ([`src/byok.js` L38](https://github.com/marbaji/maze/blob/main/src/byok.js#L38)) and sends it only in the `x-api-key` header of a request to `https://api.anthropic.com/v1/messages` ([`src/byok.js` L44-L47](https://github.com/marbaji/maze/blob/main/src/byok.js#L44-L47)). There is no server of ours in between. The page keeps the key in `sessionStorage`, so it is gone when the tab closes ([`build/make-play-page.py` L73-L75](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L73-L75)), and the "Forget key" button removes it and stops any call in flight ([L91](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L91) and [L96](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L96)). The page's Content Security Policy allows connections only to `https://api.anthropic.com` ([L20-L22](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L20-L22)).
+The "Ask anything" feature needs an Anthropic API key that you paste in yourself. The page trims the key ([`src/byok.js` L39](https://github.com/marbaji/maze/blob/main/src/byok.js#L39)) and sends it only in the `x-api-key` header of a request to `https://api.anthropic.com/v1/messages` ([`src/byok.js` L45-L48](https://github.com/marbaji/maze/blob/main/src/byok.js#L45-L48)). There is no server of ours in between. The page keeps the key in `sessionStorage`, so it stays in that one tab until you close the tab or press "Forget key" ([`build/make-play-page.py` L80-L82](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L80-L82)), and the "Forget key" button removes it and stops any call in flight ([L98](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L98) and [L103](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L103)). The page's Content Security Policy allows connections only to `https://api.anthropic.com` ([L20-L22](https://github.com/marbaji/maze/blob/main/build/make-play-page.py#L20-L22)).
 
 ## Bugs
 
@@ -21,9 +21,13 @@ python3 build/make-play-page.py
 node tests/byok.test.cjs
 bash tests/rebuild-check.sh
 python3 tests/privacy-scan.py
+python3 tests/import-check.py
+python3 tests/readme-links-check.py
+node tests/play-page-check.cjs index.html
+node tests/play-behaviour.cjs
 ```
 
-CI runs the last three on every pull request and push to `main`. `tests/play-page-check.cjs` and `tests/play-behaviour.cjs` are Playwright browser checks that you run by hand.
+CI runs every check after the build on each pull request and push to `main`; the last two are Playwright browser checks and need `playwright` installed (`PLAYWRIGHT_PATH` can point at an install elsewhere).
 
 ## Licence
 

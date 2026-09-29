@@ -5,7 +5,7 @@ const path = require('path');
 let unhandled = null;
 process.on('unhandledRejection', (e) => { unhandled = e || new Error('unhandled rejection'); console.error('UNHANDLED REJECTION', e); process.exit(1); });
 
-const { makeKeySample, looksLikeAnthropicKey, maskKey } = require(path.join(__dirname, '..', 'src', 'byok.js'));
+const { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE } = require(path.join(__dirname, '..', 'src', 'byok.js'));
 
 const enc = new TextEncoder();
 const KEY = 'sk-ant-api03-testQNoA';
@@ -120,6 +120,8 @@ t('5 completion required', async () => {
   await rejects(run([early]), 'upstream_error', (e) => assert.strictEqual(e.text, 'first'));
   await rejects(run([start + textStart + 'event: content_block_delta\ndata: {not json\n\n' + stopDelta('end_turn') + stopMsg]), 'upstream_error');
   await rejects(run([stopMsg]), 'upstream_error');
+  // a stop reason and message_stop, but no message_start: not a whole answer
+  await rejects(run([textStart + textDelta('x') + blockStop + stopDelta('end_turn') + stopMsg]), 'upstream_error', (e) => assert.strictEqual(e.text, 'x'));
   await rejects(run([start + textStart + blockStop + stopDelta('end_turn') + stopMsg]), 'empty_completion');
 });
 
@@ -144,10 +146,13 @@ t('7 http errors', async () => {
   await rejects(go(errRes(529, 'overloaded_error')), 'upstream_error');
   await rejects(go(errRes(500, 'api_error')), 'upstream_error');
   await rejects(go(errRes(400, 'invalid_request_error', 'bad field')), 'invalid_request');
+  await rejects(go(errRes(404, 'not_found_error', 'model: claude-opus-5-5')), 'permission');
   const raw = (status) => async () => new Response('<html>gateway</html>', { status });
   await rejects(go(raw(401)), 'bad_key');
   await rejects(go(raw(429)), 'rate_limited');
   await rejects(go(raw(502)), 'upstream_error');
+  await rejects(go(raw(404)), 'permission');
+  await rejects(go(raw(402)), 'no_credit');
 });
 
 t('8 sse error event', async () => {
@@ -217,6 +222,38 @@ t('10d abort inside a chunk carrying several text deltas', async () => {
   const p = makeKeySample({ key: KEY, fetchImpl: okFetch([one]) })('hi', { signal: ac.signal, onText: () => { n++; ac.abort(); } });
   await rejects(p, 'cancelled');
   assert.strictEqual(n, 1, 'onText must fire exactly once, not for deltas after the abort');
+});
+
+t('12 empty chunk after a CR', async () => {
+  // parser: a CR at a chunk's end, then an empty chunk, then the LF: one line end, not two
+  const p = parseSSE();
+  const got = [].concat(p.push('data: a\r'), p.push(''), p.push('\ndata: b\r\n\r\n'), p.end());
+  assert.deepStrictEqual(got, [{ event: 'message', data: 'a\nb' }]);
+  // through the adapter: a multi-line data event split at its CR, with an empty chunk between CR and LF
+  const split = start + textStart +
+    'event: content_block_delta\r\ndata: {\r\ndata: "type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Hello world"}}\r\n\r\n' +
+    blockStop + stopDelta('end_turn') + stopMsg;
+  const i = split.indexOf('data: {\r') + 'data: {\r'.length;
+  assert.strictEqual((await run([split.slice(0, i), new Uint8Array(0), split.slice(i)])).text, 'Hello world');
+});
+
+t('13 no body', async () => {
+  const f = async () => ({ ok: true, status: 200, body: null });
+  await rejects(makeKeySample({ key: KEY, fetchImpl: f })('hi'), 'upstream_error');
+});
+
+t('14 a DOMException mid-stream is an upstream error, not rethrown', async () => {
+  let reads = 0;
+  const f = async () => ({
+    ok: true, status: 200,
+    body: { getReader: () => ({
+      read: () => (++reads === 1 ? Promise.resolve({ done: false, value: enc.encode(start + textStart + textDelta('part')) })
+        : Promise.reject(new DOMException('The network connection was lost.', 'NetworkError'))),
+      cancel: () => Promise.resolve(),
+    }) },
+  });
+  assert.strictEqual(typeof new DOMException('x', 'NetworkError').code, 'number', 'premise: a DOMException has a numeric code');
+  await rejects(makeKeySample({ key: KEY, fetchImpl: f })('hi'), 'upstream_error', (e) => assert.strictEqual(e.text, 'part'));
 });
 
 t('11 json', async () => {

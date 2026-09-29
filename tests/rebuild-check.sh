@@ -3,7 +3,7 @@
 # (build/input/game-public.html and src/byok.js). Exit 1 on any difference.
 set -u
 here="$(cd "$(dirname "$0")/.." && pwd)"
-tmp="$(mktemp -d)"
+tmp="$(mktemp -d)" || { echo "FAILED rebuild-check: mktemp"; exit 1; }
 trap 'rm -rf "$tmp"' EXIT
 "${PYTHON:-python3}" "$here/build/make-play-page.py" "$tmp/index.html" >/dev/null || { echo "FAILED rebuild-check: the builder failed"; exit 1; }
 if cmp -s "$tmp/index.html" "$here/index.html"; then
