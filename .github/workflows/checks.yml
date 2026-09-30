@@ -42,3 +42,5 @@ jobs:
         run: node tests/play-page-check.cjs index.html
       - name: Play page behaviour
         run: node tests/play-behaviour.cjs
+      - name: Picture guide to getting a key
+        run: node tests/guide-check.cjs

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en"><head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Get a key for the maze</title>
+<link rel="stylesheet" href="../fonts/fonts.css">
+<style>
+:root{
+  --paper:#EEF1F3; --card:#FFFFFF; --ink:#1B2A33; --ink-2:#3E4F5A; --muted:#66757F; --line:#D5DBE0;
+  --teal:#0E6A78; --teal-soft:#DCEEF1; --sticky:#FFD948; --sticky-ink:#3A2E00;
+  --shadow:0 1px 2px rgba(27,42,51,.06),0 8px 24px rgba(27,42,51,.06);
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --sans:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#14181C; --card:#1D2329; --ink:#E8ECEF; --ink-2:#C2CAD1; --muted:#8C98A2; --line:#2E373F;
+    --teal:#5FB8C6; --teal-soft:#16333A; --sticky:#F2CC3B; --sticky-ink:#2A2000;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14181C; --card:#1D2329; --ink:#E8ECEF; --ink-2:#C2CAD1; --muted:#8C98A2; --line:#2E373F;
+  --teal:#5FB8C6; --teal-soft:#16333A; --sticky:#F2CC3B; --sticky-ink:#2A2000;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 var(--serif);-webkit-font-smoothing:antialiased}
+a{color:var(--teal)}
+a:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+.wrap{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+.back{display:inline-flex;align-items:center;min-height:44px;font:600 14px/1 var(--sans);text-decoration:none}
+h1{font:800 clamp(32px,6vw,52px)/1.05 var(--sans);letter-spacing:-.03em;margin:.35em 0 .35em;text-wrap:balance}
+.intro{color:var(--ink-2);margin:0 0 8px}
+ol.steps{list-style:none;margin:32px 0 0;padding:0;counter-reset:step}
+ol.steps>li{counter-increment:step;margin:0 0 44px}
+.step{display:flex;gap:14px;align-items:flex-start;margin:0 0 14px;font:600 18px/1.45 var(--sans)}
+.step::before{content:counter(step);flex:0 0 36px;height:36px;border-radius:50%;background:var(--sticky);color:var(--sticky-ink);display:grid;place-items:center;font:800 17px/1 var(--sans)}
+.step span{padding-top:4px}
+figure{margin:0}
+figure img{display:block;max-width:100%;height:auto;margin:0 auto;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);background:#fff}
+figure img.clear{border:0;box-shadow:none;background:none}
+figcaption{margin:10px 0 0;font:400 15px/1.5 var(--sans);color:var(--ink-2)}
+figcaption b{color:var(--ink)}
+.closing{margin:8px 0 0;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:16px}
+.closing p{margin:0}
+.home{display:inline-flex;align-items:center;min-height:48px;margin-top:24px;padding:0 20px;border-radius:10px;background:var(--teal);color:var(--card);font:700 15px/1 var(--sans);text-decoration:none}
+code{font:400 .9em/1 var(--mono)}
+</style>
+</head><body>
+<main class="wrap">
+  <a class="back" href="../#read-play">&larr; Back to the maze</a>
+  <h1>Get an Anthropic API key for the maze</h1>
+  <p class="intro">It takes about 2 minutes. The key is your own, and a question in the maze usually costs between 5 and 25 cents on it. Here is every screen you will see, in order.</p>
+
+  <ol class="steps">
+    <li>
+      <p class="step"><span>Open <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a> and sign in, or create an account. If it asks how you will use the Claude API, choose Individual.</span></p>
+      <figure>
+        <img src="img/1.png" width="758" height="427" alt="The Claude Console asking How will you use the Claude API?, with two cards: Individual on the left and Organization on the right.">
+        <figcaption>Click the <b>Individual</b> card on the left.</figcaption>
+      </figure>
+    </li>
+    <li>
+      <p class="step"><span>If it asks you to buy usage credits, the smallest amount is plenty: $5 covers dozens of questions, or type $3 under Other. Leave Auto-reload off.</span></p>
+      <figure>
+        <img src="img/2.png" width="608" height="507" alt="The Buy usage credits screen: amount buttons for $5, $20, $100 and Other, a payment method list, and an Auto-reload switch that is off.">
+        <figcaption><b>$5</b> is the first button; <b>Other</b> lets you type a smaller amount. The <b>Auto-reload</b> switch at the bottom stays off.</figcaption>
+      </figure>
+    </li>
+    <li>
+      <p class="step"><span>Click Create key. If a pop-up offers identity federation, click Continue with an API key.</span></p>
+      <figure>
+        <img class="clear" src="img/3.png" width="520" height="660" alt="Top: the empty API keys page with a Create key button. Bottom: a pop-up titled With identity federation, you don't need an API key, with a black Set up identity federation button and a plain Continue with an API key link under it.">
+        <figcaption>Top: the <b>Create key</b> button on the API keys page. Bottom: the pop-up; skip the black button and click <b>Continue with an API key</b> under it.</figcaption>
+      </figure>
+    </li>
+    <li>
+      <p class="step"><span>Give the key any name, set Expires to 3 hours, leave Linked account as it is, set Scope to Default workspace, and click Create key.</span></p>
+      <figure>
+        <img src="img/4.png" width="520" height="445" alt="The Create API key form filled in: Name maze-test, Expires 3 hours, Linked account showing your name, and the Scope menu open with Organization and Default workspace.">
+        <figcaption>The form opens with Expires at 30 days; change it to <b>3 hours</b>. In the Scope menu pick <b>Default workspace</b>, then click Create key at the bottom of the form.</figcaption>
+      </figure>
+    </li>
+    <li>
+      <p class="step"><span>Click Copy key and paste it into the game's key box.</span></p>
+      <figure>
+        <img src="img/5.png" width="406" height="355" alt="The maze's Ask anything panel: a question box, Ask, Stop and Reset buttons, and below them the Anthropic API key box with an input that reads sk-ant- and a Use key button.">
+        <figcaption>Back in the maze, open the <b>Ask anything</b> tab. Paste the key into the <b>Anthropic API key</b> box (it starts with <code>sk-ant-</code>) and press <b>Use key</b>.</figcaption>
+      </figure>
+    </li>
+  </ol>
+
+  <div class="closing"><p>The key stays in this tab until you close the tab or press Forget key. The page sends it only to Anthropic. All the code runs on this page, so you can read it with your browser's View Source; the same code is published at <a href="https://github.com/marbaji/maze" target="_blank" rel="noopener">github.com/marbaji/maze</a>.</p></div>
+
+  <a class="home" href="../#read-play">Back to the maze</a>
+</main>
+</body></html>
