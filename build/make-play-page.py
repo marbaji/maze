@@ -82,6 +82,7 @@ KEYBOX_CSS = (
     ".keybox #keystate{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0}\n"
     ".keybox #keymasked{font:600 13px/1 var(--mono);color:var(--ink)}\n"
     ".keybox #keyerr{color:var(--sucks)}\n"
+    ".keybox #keyguide{margin:14px 0 2px}\n"
     ".keybox details{margin-top:8px;font:400 13px/1.45 var(--sans);color:var(--ink-2)}\n"
     ".keybox summary{cursor:pointer;color:var(--teal);font-weight:600;padding:10px 0}\n"
     ".keybox ol{margin:4px 0 8px;padding-left:20px}\n"
