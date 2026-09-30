@@ -48,6 +48,7 @@ async function structure(page, width) {
       forgetText: document.getElementById('forgetkey') ? document.getElementById('forgetkey').textContent : null,
       maskedTag: masked ? masked.tagName : null, maskedOnclick: masked ? masked.hasAttribute('onclick') : null,
       bodyText: document.body.innerText,
+      guideItems: document.querySelectorAll('#keyguide li').length, guideText: document.getElementById('keyguide') ? document.getElementById('keyguide').textContent : '',
       guideLinks: [...document.querySelectorAll('#keyguide a[href]')].map((a) => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') })),
       cspCount: csp.length, cspContent: csp[0] ? csp[0].getAttribute('content') : null, cspInHead: csp[0] ? document.head.contains(csp[0]) : false,
       offOrigin: off,
@@ -72,6 +73,9 @@ async function structure(page, width) {
     const l = s.guideLinks.find((x) => x.href === want);
     check(l && l.target === '_blank' && l.rel === 'noopener', `key guide link ${want}: ${JSON.stringify(l || 'missing')}` + at);
   }
+  check(s.guideItems === 5, `key guide list items ${s.guideItems}` + at);
+  for (const p of ['choose Individual', 'Default workspace', 'Continue with an API key', '5 and 25 cents']) check(s.guideText.includes(p), `key guide lacks "${p}"` + at);
+  check(!s.guideText.includes('\u2014'), 'key guide contains an em dash' + at);
   check(s.cspCount === 1, `CSP meta count ${s.cspCount}` + at);
   check(s.cspContent === CSP, `CSP content differs: ${JSON.stringify(s.cspContent)}` + at);
   check(s.cspInHead, 'CSP meta is not in the document head' + at);
