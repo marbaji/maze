@@ -19,7 +19,7 @@ BYOK = ROOT / "src" / "byok.js"
 
 # Anthropic's server-side fallback: when True, the shipped adapter asks for it (header anthropic-beta and body fallbacks:"default"),
 # so a request Opus 5.5 declines is finished by the fallback model on the same stream. The one switch; the page reports the serving model either way.
-USE_FALLBACK = False
+USE_FALLBACK = True
 
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; "
        "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; "

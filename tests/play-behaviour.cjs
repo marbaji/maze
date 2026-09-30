@@ -68,7 +68,7 @@ let routed = [];
 const stream = { reqs: [], plan: { writer: [], judge: [], gate: [] } };
 
 function startStreamServer() {
-  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type, x-api-key, anthropic-version, anthropic-dangerous-direct-browser-access' };
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type, x-api-key, anthropic-version, anthropic-dangerous-direct-browser-access, anthropic-beta' };
   const srv = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
     let raw = '';
@@ -239,7 +239,12 @@ async function case4() {
   check(r.headers['anthropic-version'] === '2023-06-01', 'case 4: anthropic-version header');
   check(r.headers['anthropic-dangerous-direct-browser-access'] === 'true', 'case 4: direct browser access header');
   check(r.body.model === 'claude-opus-5-5' && r.body.stream === true, `case 4: body model ${r.body.model}, stream ${r.body.stream}`);
-  check(!('anthropic-beta' in r.headers) && !('fallbacks' in r.body), `case 4: the shipped page asked for the server-side fallback (anthropic-beta ${JSON.stringify(r.headers['anthropic-beta'])}, fallbacks ${JSON.stringify(r.body.fallbacks)})`);
+  const shippedFallback = await page.evaluate(() => window.MazeByok.FALLBACK);
+  check(typeof shippedFallback === 'boolean', 'case 4: the page does not expose its FALLBACK value');
+  check(shippedFallback ? (r.headers['anthropic-beta'] === 'server-side-fallback-2026-07-01' && r.body.fallbacks === 'default') : (!('anthropic-beta' in r.headers) && !('fallbacks' in r.body)), `case 4: the request does not match the shipped fallback (${shippedFallback}): anthropic-beta ${JSON.stringify(r.headers['anthropic-beta'])}, fallbacks ${JSON.stringify(r.body.fallbacks)}`);
+  const known = ['content-type', 'x-api-key', 'anthropic-version', 'anthropic-dangerous-direct-browser-access', 'anthropic-beta'];
+  const extra = Object.keys(r.headers).filter((h) => !known.includes(h.toLowerCase()) && !/^(accept|accept-encoding|accept-language|user-agent|origin|referer|content-length|host|connection|sec-.*|priority|cache-control|pragma)$/i.test(h));
+  check(extra.length === 0, 'case 4: unexpected request headers: ' + extra.join(','));
   check(!MODEL_LINE.test(log), 'case 4: a serving-model line with no model named:\n' + log);
   check((await state(page)).send === false, 'case 4: Send is not enabled after the answer');
   await context.close();

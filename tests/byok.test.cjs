@@ -6,7 +6,7 @@ let unhandled = null;
 process.on('unhandledRejection', (e) => { unhandled = e || new Error('unhandled rejection'); console.error('UNHANDLED REJECTION', e); process.exit(1); });
 
 const fs = require('fs');
-const { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE } = require(path.join(__dirname, '..', 'src', 'byok.js'));
+const { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE, FALLBACK: srcFallback } = require(path.join(__dirname, '..', 'src', 'byok.js'));
 // the adapter as shipped: the copy inlined into index.html, whose FALLBACK the builder set from USE_FALLBACK
 const built = (() => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
@@ -67,25 +67,30 @@ t('1 key helpers', async () => {
   assert.strictEqual(maskKey(' sk-ant-api03-xyzQNoA '), '····QNoA');
 });
 
-for (const [label, mk] of [['src/byok.js', makeKeySample], ['index.html', built.makeKeySample]]) t('2 request shape, fallback off (' + label + ')', async () => {
+// the value each copy ships with: the module default, and whatever the builder set in the page
+const shipped = { 'src/byok.js': srcFallback, 'index.html': built.FALLBACK };
+assert.strictEqual(typeof srcFallback, 'boolean'); assert.strictEqual(typeof built.FALLBACK, 'boolean');
+for (const [label, mk] of [['src/byok.js', makeKeySample], ['index.html', built.makeKeySample]]) t('2 request shape, fallback ' + (shipped[label] ? 'on' : 'off') + ' as shipped (' + label + ')', async () => {
   let seen;
   const f = async (url, init) => { seen = { url, init }; return streamRes([HAPPY]); };
   await mk({ key: '  ' + KEY + '\n', fetchImpl: f })('hi');
   assert.strictEqual(seen.url, 'https://api.anthropic.com/v1/messages');
   assert.strictEqual(seen.init.method, 'POST');
-  assert.deepStrictEqual(seen.init.headers, {
+  const on = shipped[label];
+  assert.deepStrictEqual(seen.init.headers, Object.assign({
     'content-type': 'application/json',
     'x-api-key': KEY,
     'anthropic-version': '2023-06-01',
     'anthropic-dangerous-direct-browser-access': 'true',
-  });
+  }, on ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}));
   const body = JSON.parse(seen.init.body);
   assert.strictEqual(body.model, 'claude-opus-5-5');
   assert.strictEqual(body.stream, true);
   assert.strictEqual(body.max_tokens, 16000);
   assert.deepStrictEqual(body.output_config, { effort: 'medium' });
   assert.deepStrictEqual(body.messages, [{ role: 'user', content: 'hi' }]);
-  for (const k of ['thinking', 'temperature', 'budget_tokens', 'fallbacks']) assert(!(k in body), k + ' must be absent');
+  for (const k of ['thinking', 'temperature', 'budget_tokens']) assert(!(k in body), k + ' must be absent');
+  if (on) assert.strictEqual(body.fallbacks, 'default'); else assert(!('fallbacks' in body), 'fallbacks must be absent');
 });
 
 t('2b request shape, fallback on', async () => {

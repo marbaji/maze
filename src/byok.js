@@ -95,6 +95,6 @@
     };
     return sample;
   }
-  const api = { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE };
+  const api = { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE, FALLBACK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.MazeByok = api;
 })(typeof window !== 'undefined' ? window : globalThis);
