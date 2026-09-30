@@ -40,10 +40,10 @@ WRITER_NEW = "Build what the player asks for, as asked."
 SIM_WIN = "this version can be won: "
 SIM_KEEP = "the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; "
 SIM_TEXT = {
-    "judge_win": 'Simulated judge: there is no API key, so no AI ran. This is the verdict a judge gives when it reads the program correctly: "{why}". A real judge is a model, and a model can be talked out of the right answer.',
-    "judge_keep": 'Simulated judge: there is no API key, so no AI ran. A judge that reads the program correctly lets this change through, because the maze stays unwinnable: "{why}". A real judge is a model, and a model can be talked out of the right answer.',
-    "prose_win": "Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would refuse this change, because this version can be won. A real AI reads that sentence as one line among many, and a request worded the right way can get past it.",
-    "prose_keep": 'Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would apply this change, because the maze stays unwinnable: "{why}". A real AI reads that sentence as one line among many, and a request worded the right way can get past it.',
+    "judge_win": 'This is the verdict a judge gives when it reads the program correctly: "{why}". But a judge is a model, and a model can be talked out of the right answer.',
+    "judge_keep": 'A judge that reads the program correctly lets this change through, because the maze stays unwinnable. But a judge is a model, and a model can be talked out of the right answer.',
+    "prose_win": 'An AI that follows the rule sentence would refuse this change, because this version can be won. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.',
+    "prose_keep": 'An AI that follows the rule sentence would apply this change, because the maze stays unwinnable. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.',
 }
 SIM_LOG = {
     "judge_win": 'simulated judge: rejected this program. there is no API key, so no AI ran; a judge that reads the program correctly says it can be won: "{why}".',

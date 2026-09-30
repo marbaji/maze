@@ -528,10 +528,10 @@ const quickWhys = (() => {
 const repairWhy = (id) => { const m = INPUT.match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
 const q = (why) => why.replace(/\.$/, '');
 const SIM = {
-  judge_win: (w) => `Simulated judge: there is no API key, so no AI ran. This is the verdict a judge gives when it reads the program correctly: "${q(w)}". A real judge is a model, and a model can be talked out of the right answer.`,
-  judge_keep: (w) => `Simulated judge: there is no API key, so no AI ran. A judge that reads the program correctly lets this change through, because the maze stays unwinnable: "${q(w)}". A real judge is a model, and a model can be talked out of the right answer.`,
-  prose_win: () => 'Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would refuse this change, because this version can be won. A real AI reads that sentence as one line among many, and a request worded the right way can get past it.',
-  prose_keep: (w) => `Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would apply this change, because the maze stays unwinnable: "${q(w)}". A real AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
+  judge_win: (w) => `This is the verdict a judge gives when it reads the program correctly: ""${q(w)}"". But a judge is a model, and a model can be talked out of the right answer.`,
+  judge_keep: () => `A judge that reads the program correctly lets this change through, because the maze stays unwinnable. But a judge is a model, and a model can be talked out of the right answer.`,
+  prose_win: () => `An AI that follows the rule sentence would refuse this change, because this version can be won. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
+  prose_keep: () => `An AI that follows the rule sentence would apply this change, because the maze stays unwinnable. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
 };
 async function case12() {
   const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
@@ -555,16 +555,16 @@ async function case12() {
       // the literal program is caught by the simulated verdict; the page's repaired version is then judged let through, and runs
       check(s.log.includes('simulated judge: rejected this program. there is no API key, so no AI ran; a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the simulated verdict:\n${s.log}`);
       check(/the page has a repaired version of it/.test(s.log) && applied, `${at}: the repaired version did not run:\n${s.log}`);
-      check(s.card.includes('You picked "' + e.name + '". The literal version was caught, so the page ran its repaired version. ' + SIM.judge_keep(repairWhy(e.id))), `${at}: card:\n${s.card}`);
+      check(s.card.includes('You picked "' + e.name + '". The literal version was caught, so the page ran its repaired version. ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (mode === 'Judge') {
       check(applied && /simulated judge: passed\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
-      check(s.card.includes('You picked "' + e.name + '". ' + SIM.judge_keep(e.why)), `${at}: card:\n${s.card}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (e === win) {
       check(!applied && !/the program goes to the check/.test(s.log), `${at}: the change was applied:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_win()), `${at}: card:\n${s.card}`);
     } else {
       check(applied && /applied\. nobody checked it\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
-      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_keep(e.why)), `${at}: card:\n${s.card}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_keep()), `${at}: card:\n${s.card}`);
     }
     await context.close();
   }
@@ -597,7 +597,7 @@ async function case10() {
     await context.close();
   }
   check(/caught/.test(cards['Code (proof)']) && /RULE HELD/.test(cards['Code (proof)']), 'case 10 (Code (proof)): premise: the canned change was not caught:\n' + cards['Code (proof)']);
-  for (const m of ['Judge', 'Prose']) check(/Simulated/.test(cards[m]), `case 10 (${m}): the card carries no simulated answer:\n` + cards[m]);
+  for (const m of ['Judge', 'Prose']) check(/But an? (judge|AI) (is a model|reads that sentence)/.test(cards[m]), `case 10 (${m}): the card carries no simulated answer:\n` + cards[m]);
   check(!/No judge ran|unjudged|Prose needs the AI/.test(cards.Judge + cards.Prose), 'case 10: an old no-key text is still shown');
 }
 
