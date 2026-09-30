@@ -14,14 +14,7 @@ const GUIDE = `${ORIGIN}/guide/`;
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); };
 
-// the key box on the game page and this guide list the same five steps; the guide's step texts must match the game's list items
-function gameSteps() {
-  const src = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const box = src.slice(src.indexOf('<details id="keyguide">'), src.indexOf('</details>', src.indexOf('<details id="keyguide">')));
-  const items = [...box.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
-  check(items.length === 5, `game key guide has ${items.length} steps, expected 5 (premise of the step comparison)`);
-  return items;
-}
+const STEP2 = 'If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type $2-3. Leave Auto-reload off.';
 
 async function waitForServer() {
   for (let i = 0; i < 100; i++) {
@@ -37,7 +30,6 @@ async function waitForServer() {
   try {
     await waitForServer();
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
-    const want = gameSteps();
 
     for (const scheme of ['light', 'dark']) {
       for (const [w, h] of [[1280, 900], [390, 844]]) {
@@ -78,10 +70,10 @@ async function waitForServer() {
           check(i.w && i.h, `img without width/height attributes: ${i.src}` + at);
           check(i.shown <= s.clientW, `img wider than the viewport: ${i.src} ${i.shown}px` + at);
         }
-        // steps 1 to 4 are the game's sentences word for word; step 5 swaps "above" for "into the game's key box"
         check(s.steps.length === 5, `guide has ${s.steps.length} steps` + at);
-        for (let k = 0; k < 4; k++) check(s.steps[k] === want[k], `step ${k + 1} differs from the game's:\n    guide ${JSON.stringify(s.steps[k])}\n    game  ${JSON.stringify(want[k])}` + at);
-        check(s.steps[4] === want[4].replace('paste it above', "paste it into the game's key box"), `step 5 ${JSON.stringify(s.steps[4])}` + at);
+        check(s.steps[1] === STEP2, `step 2 ${JSON.stringify(s.steps[1])}` + at);
+        check(s.text.includes('between 5 and 20 cents'), 'intro lacks "between 5 and 20 cents"' + at);
+        check(s.text.includes("All the code runs on the game's page, so you can read it with your browser's View Source"), 'closing paragraph wording' + at);
         check(s.back.includes('Back to the maze'), `no "Back to the maze" link to ../#read-play` + at);
         check(!s.html.includes('\u2014'), 'the guide contains an em dash' + at);
         check(s.text.includes('Forget key') && s.text.includes('View Source'), 'closing paragraph missing' + at);
@@ -100,7 +92,7 @@ async function waitForServer() {
       const a = [...document.querySelectorAll('#keyguide a')].find((x) => x.getAttribute('href') === 'guide/');
       return a ? { text: a.textContent.trim(), href: a.href } : null;
     });
-    check(link && link.text === 'Step-by-step with pictures', `game key box link to guide/: ${JSON.stringify(link)}`);
+    check(link && link.text === 'How to get a key (2 minutes)', `game key box link to guide/: ${JSON.stringify(link)}`);
     if (link) { const r = await page.request.get(link.href); check(r.status() === 200, `game's guide link ${link.href} answered ${r.status()}`); }
     await page.close();
   } catch (e) {

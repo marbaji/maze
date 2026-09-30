@@ -48,8 +48,9 @@ async function structure(page, width) {
       forgetText: document.getElementById('forgetkey') ? document.getElementById('forgetkey').textContent : null,
       maskedTag: masked ? masked.tagName : null, maskedOnclick: masked ? masked.hasAttribute('onclick') : null,
       bodyText: document.body.innerText,
-      guideItems: document.querySelectorAll('#keyguide li').length, guideText: document.getElementById('keyguide') ? document.getElementById('keyguide').textContent : '',
-      guideLinks: [...document.querySelectorAll('#keyguide a[href]')].map((a) => ({ href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel') })),
+      guideTag: document.getElementById('keyguide') ? document.getElementById('keyguide').tagName : null,
+      guideLinks: [...document.querySelectorAll('#keyguide a')].map((a) => ({ href: a.getAttribute('href'), text: a.textContent.trim() })),
+      keyboxDetails: document.querySelectorAll('#keybox details').length,
       cspCount: csp.length, cspContent: csp[0] ? csp[0].getAttribute('content') : null, cspInHead: csp[0] ? document.head.contains(csp[0]) : false,
       offOrigin: off,
       scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth,
@@ -69,13 +70,9 @@ async function structure(page, width) {
   check(s.maskedTag === 'SPAN' && s.maskedOnclick === false, `#keymasked is ${s.maskedTag}, onclick attribute ${s.maskedOnclick}` + at);
   for (const bad of ['claude.ai viewer', 'Claude cannot answer on this page']) check(!s.bodyText.includes(bad), `visible text contains "${bad}"` + at);
   check(!s.bodyText.includes('claude.ai'), 'visible text contains "claude.ai"' + at);
-  for (const want of ['https://platform.claude.com/settings/keys', 'https://github.com/marbaji/maze#how-your-api-key-is-handled']) {
-    const l = s.guideLinks.find((x) => x.href === want);
-    check(l && l.target === '_blank' && l.rel === 'noopener', `key guide link ${want}: ${JSON.stringify(l || 'missing')}` + at);
-  }
-  check(s.guideItems === 5, `key guide list items ${s.guideItems}` + at);
-  for (const p of ['choose Individual', 'Default workspace', 'Continue with an API key', '5 and 25 cents']) check(s.guideText.includes(p), `key guide lacks "${p}"` + at);
-  check(!s.guideText.includes('\u2014'), 'key guide contains an em dash' + at);
+  check(s.guideTag === 'P', `#keyguide is ${s.guideTag}, expected P` + at);
+  check(s.guideLinks.length === 1 && s.guideLinks[0].href === 'guide/' && s.guideLinks[0].text === 'How to get a key (2 minutes)', `#keyguide links: ${JSON.stringify(s.guideLinks)}` + at);
+  check(s.keyboxDetails === 0, `details elements in the key box: ${s.keyboxDetails}` + at);
   check(s.cspCount === 1, `CSP meta count ${s.cspCount}` + at);
   check(s.cspContent === CSP, `CSP content differs: ${JSON.stringify(s.cspContent)}` + at);
   check(s.cspInHead, 'CSP meta is not in the document head' + at);

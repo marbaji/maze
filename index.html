@@ -272,14 +272,7 @@ figure.panel{padding:18px 18px 14px}
         <div class="keyrow"><input id="keyinput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"><button id="keysave" type="button">Use key</button></div>
         <p id="keystate" class="note" hidden>Key in use: <span id="keymasked"></span> <button id="forgetkey" type="button">Forget key</button></p>
         <p id="keyerr" class="note" role="alert" hidden></p>
-        <details id="keyguide"><summary>How to get a key (2 minutes)</summary>
-          <ol><li>Open <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a> and sign in, or create an account. If it asks how you will use the Claude API, choose Individual.</li>
-          <li>If it asks you to buy usage credits, the smallest amount is plenty: $5 covers dozens of questions, or type $3 under Other. Leave Auto-reload off.</li>
-          <li>Click Create key. If a pop-up offers identity federation, click Continue with an API key.</li>
-          <li>Give the key any name, set Expires to 3 hours, leave Linked account as it is, set Scope to Default workspace, and click Create key.</li>
-          <li>Click Copy key and paste it above.</li></ol>
-          <p><a href="guide/">Step-by-step with pictures</a>. A question usually costs between 5 and 25 cents on your key; a hard one can cost up to about a dollar when the AI has to try again several times. The key stays in this tab until you close the tab or press Forget key. The page sends it only to Anthropic; the code is at <a href="https://github.com/marbaji/maze#how-your-api-key-is-handled" target="_blank" rel="noopener">github.com/marbaji/maze</a>.</p>
-        </details>
+        <p id="keyguide" class="note"><a href="guide/">How to get a key (2 minutes)</a></p>
       </div>
     </div>
     <div class="row"><span class="note" id="status"></span></div>
