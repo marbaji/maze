@@ -49,7 +49,7 @@ const sseEnd = ev('content_block_stop', { type: 'content_block_stop', index: 0 }
   ev('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 9 } }) +
   ev('message_stop', { type: 'message_stop' });
 const sse = (text, model) => sseStartAs(model) + sseDelta(text.slice(0, 20)) + sseDelta(text.slice(20)) + sseEnd;
-const MODEL_LINE = /this round was answered by /;
+const MODEL_LINE = /was answered by /;
 const kindOf = (body) => { const c = (((body || {}).messages || [])[0] || {}).content || ''; return /You are a referee/.test(c) ? 'judge' : /ready-made change/.test(c) ? 'gate' : 'writer'; };
 const OK_ANSWER = { writer: WRITER_TEXT, judge: JUDGE_TEXT, gate: GATE_TEXT };
 
@@ -447,8 +447,9 @@ async function case7b() {
     const init = () => {
       window.__fakeCalls = 0;
       const text = 'SAY: Made a small five by five game with a door.\nWHY: Nothing ever raises the key count, so the goal never holds.\nPROGRAM:\n' + window.__PROGRAM__;
-      const sample = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onText) opts.onText({ text, delta: text }); return { text, truncated: false, modelTierApplied: 'complex' }; };
-      sample.json = async () => { window.__fakeCalls++; return { winnable: false, reason: 'fake' }; };
+      // it names claude-opus-4-8 as the serving model both ways, which the page must never report on the claude.ai-hosted path
+      const sample = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); if (opts && opts.onText) opts.onText({ text, delta: text }); return { text, truncated: false, modelTierApplied: 'complex', servedModel: 'claude-opus-4-8' }; };
+      sample.json = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); return { winnable: false, reason: 'fake' }; };
       window.claude = { use: async (name) => (name === 'sample' ? sample : null) };
     };
     routed = [];
@@ -460,7 +461,19 @@ async function case7b() {
     await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, 'the claude.ai ask');
     check((await page.evaluate(() => window.__fakeCalls)) >= 1, 'case 7b (claude.ai): the ask did not go through claude.use("sample")');
     check(routed.length === 0, 'case 7b (claude.ai): the ask went to the network');
+    const log = (await state(page)).log;
+    check(/AI: Made a small five by five game/.test(log), 'case 7b (claude.ai): premise: the writer answer is not in the log');
+    check(!MODEL_LINE.test(log), 'case 7b (claude.ai): a serving-model line on the claude.ai-hosted path:\n' + log);
     await context.close();
+    // and a judge call on the claude.ai-hosted path
+    const j = await open({ name: 'case 7b claude.ai Judge', init: `window.__PROGRAM__=${JSON.stringify(PROGRAM)};(${init})();` });
+    await setMode(j.page, 'Judge');
+    await ask(j.page, 'make a small different game with a door');
+    await until(async () => /result: RULE HELD/.test(await j.page.textContent('#log')), 30000, 'the claude.ai Judge ask');
+    const jlog = (await state(j.page)).log;
+    check(/judge: passed/.test(jlog), 'case 7b (claude.ai, Judge): premise: the judge did not rule:\n' + jlog);
+    check(!MODEL_LINE.test(jlog), 'case 7b (claude.ai, Judge): a serving-model line on the claude.ai-hosted path:\n' + jlog);
+    await j.context.close();
   }
 }
 
@@ -477,11 +490,80 @@ async function case11() {
     check(routed.length === 1 && routed[0].kind === 'writer', `${at}: premise: expected one writer call, got ${routed.map((r) => r.kind).join(',')}`);
     check(/AI: Made a small five by five game/.test(log), `${at}: premise: the answer is not in the log`);
     const lines = log.split('\n').filter((l) => MODEL_LINE.test(l));
-    if (want) check(lines.length === 1 && lines[0] === 'this round was answered by Claude Opus 4.8: Anthropic hands a request to it when Opus 5.5 declines.', `${at}: model lines ${JSON.stringify(lines)}`);
+    if (want) check(lines.length === 1 && lines[0] === 'this round was answered by Claude Opus 4.8, not Opus 5.5.', `${at}: model lines ${JSON.stringify(lines)}`);
     else check(lines.length === 0 && !/Claude Opus/.test(log), `${at}: model lines on an Opus 5.5 round ${JSON.stringify(lines)}`);
     check(!/\u2014/.test(lines.join('')), `${at}: an em dash in the model line`);
     await context.close();
   }
+  // a judge call and a Prose gate call served by claude-opus-4-8: one line each, naming the call
+  for (const [mode, kind, how, want] of [['Judge', 'judge', 'ask', 'the judge call was answered by Claude Opus 4.8, not Opus 5.5.'], ['Prose', 'gate', 'canned', 'the call on whether to apply it was answered by Claude Opus 4.8, not Opus 5.5.']]) {
+    routed = [];
+    const at = `case 11 (${kind} served by claude-opus-4-8)`;
+    const { context, page } = await open({ name: at, answers: { [kind]: ['claude-opus-4-8'] } });
+    await saveKey(page, KEY);
+    await setMode(page, mode);
+    if (how === 'ask') await ask(page, 'make a small different game with a door'); else await canned(page, 0);
+    await until(() => routed.some((r) => r.kind === kind), 30000, at + ' call');
+    await idle(page);
+    const log = (await state(page)).log;
+    check(/judge: passed|AI: Applied as asked/.test(log), `${at}: premise: the ${kind} answer was not used:\n` + log);
+    const lines = log.split('\n').filter((l) => MODEL_LINE.test(l));
+    check(lines.length === 1 && lines[0] === want, `${at}: model lines ${JSON.stringify(lines)}`);
+    await context.close();
+  }
+}
+
+// ---- no key: the simulated Judge and Prose answers. The expected texts are Mo's approved wording (the claim itself); the why lines and the
+// winnable split come from the build input, read here independently of the page's own derivation
+const INPUT = fs.readFileSync(path.join(ROOT, 'build', 'input', 'game-public.html'), 'utf8');
+const quickWhys = (() => {
+  const a = INPUT.indexOf('const QUICK = [\n'), block = INPUT.slice(a, INPUT.indexOf('\n];', a));
+  return [...block.matchAll(/\{id:'(\w+)', name:'([^']+)'[^\n]*?why:"((?:[^"\\]|\\.)*)"/g)].map((m) => ({ id: m[1], name: m[2], why: JSON.parse('"' + m[3] + '"') }));
+})();
+const repairWhy = (id) => { const m = INPUT.match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
+const q = (why) => why.replace(/\.$/, '');
+const SIM = {
+  judge_win: (w) => `Simulated judge: there is no API key, so no AI ran. This is the verdict a judge gives when it reads the program correctly: "${q(w)}". A real judge is a model, and a model can be talked out of the right answer.`,
+  judge_keep: (w) => `Simulated judge: there is no API key, so no AI ran. A judge that reads the program correctly lets this change through, because the maze stays unwinnable: "${q(w)}". A real judge is a model, and a model can be talked out of the right answer.`,
+  prose_win: () => 'Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would refuse this change, because this version can be won. A real AI reads that sentence as one line among many, and a request worded the right way can get past it.',
+  prose_keep: (w) => `Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would apply this change, because the maze stays unwinnable: "${q(w)}". A real AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
+};
+async function case12() {
+  const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
+  check(quickWhys.length >= 2 && win && keep && repairWhy(win.id), `case 12: premise: could not read a winnable and an unwinnable change from QUICK (${quickWhys.length} read)`);
+  if (!win || !keep) return;
+  const runs = [];
+  for (const mode of ['Judge', 'Prose']) for (const e of [win, keep]) {
+    routed = [];
+    const at = `case 12 (${mode}, ${e.id})`;
+    const { context, page } = await open({ name: at });
+    await setMode(page, mode);
+    await page.click('#tabQuick'); await page.locator('#opts .opt', { hasText: e.name }).first().click();
+    await idle(page);
+    const s = await state(page);
+    runs.push(at);
+    const applied = /running the new program/.test(s.log);
+    check(routed.length === 0, `${at}: an Anthropic request was made with no key`);
+    check(/RULE HELD/.test(s.card), `${at}: the rule did not hold:\n${s.card}`);
+    check(!/\u2014/.test(s.card), `${at}: an em dash on the card`);
+    if (mode === 'Judge' && e === win) {
+      // the literal program is caught by the simulated verdict; the page's repaired version is then judged let through, and runs
+      check(s.log.includes('simulated judge: rejected this program. there is no API key, so no AI ran; a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the simulated verdict:\n${s.log}`);
+      check(/the page has a repaired version of it/.test(s.log) && applied, `${at}: the repaired version did not run:\n${s.log}`);
+      check(s.card.includes('You picked "' + e.name + '". The literal version was caught, so the page ran its repaired version. ' + SIM.judge_keep(repairWhy(e.id))), `${at}: card:\n${s.card}`);
+    } else if (mode === 'Judge') {
+      check(applied && /simulated judge: passed\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.judge_keep(e.why)), `${at}: card:\n${s.card}`);
+    } else if (e === win) {
+      check(!applied && !/the program goes to the check/.test(s.log), `${at}: the change was applied:\n${s.log}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_win()), `${at}: card:\n${s.card}`);
+    } else {
+      check(applied && /applied\. nobody checked it\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_keep(e.why)), `${at}: card:\n${s.card}`);
+    }
+    await context.close();
+  }
+  check(runs.length === 4, `case 12: premise: ${runs.length} of 4 runs`);
 }
 
 async function case8() {
@@ -510,10 +592,8 @@ async function case10() {
     await context.close();
   }
   check(/caught/.test(cards['Code (proof)']) && /RULE HELD/.test(cards['Code (proof)']), 'case 10 (Code (proof)): premise: the canned change was not caught:\n' + cards['Code (proof)']);
-  const j = cards.Judge;
-  check(/No judge ran/.test(j) && /no API key/.test(j) && /unjudged/.test(j), 'case 10 (Judge): the card does not say no judge ran for want of a key:\n' + j);
-  check(!/The judge read it|said not winnable|said winnable/.test(j), 'case 10 (Judge): the card reads as if the judge ruled:\n' + j);
-  check(/Anthropic API key/.test(cards.Prose) && /Ask tab/.test(cards.Prose), 'case 10 (Prose): the card does not send the reader to the key box:\n' + cards.Prose);
+  for (const m of ['Judge', 'Prose']) check(/Simulated/.test(cards[m]), `case 10 (${m}): the card carries no simulated answer:\n` + cards[m]);
+  check(!/No judge ran|unjudged|Prose needs the AI/.test(cards.Judge + cards.Prose), 'case 10: an old no-key text is still shown');
 }
 
 async function case9() {
@@ -547,7 +627,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/index.html')).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;

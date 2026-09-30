@@ -34,9 +34,23 @@ BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with 
 WRITER_OLD = "You never refuse and you never substitute: if the player asks for something, build that thing."
 WRITER_NEW = "Build what the player asks for, as asked."
 
-NEEDS_KEY_PROSE = "Prose needs the AI, which runs once you paste an Anthropic API key in the Ask tab. Nothing applied."
-NO_JUDGE_CARD = "No judge ran, because there is no API key, so the change was let through unjudged."
-NO_JUDGE_LOG = "no judge ran: there is no API key, so the change was let through unjudged. paste an Anthropic API key in the Ask tab to have the judge read each change."
+# no API key: a canned change under Judge or Prose gets a simulated answer, derived from the change's own why line (QUICK, or REPAIR_WHY for the
+# page's repaired versions). A why line that starts SIM_WIN describes a winnable version; the canned ones that keep the maze unwinnable start SIM_KEEP.
+# The game then plays out exactly as it would with that answer. {why} is the why line, its closing full stop dropped. Wording approved by Mo, 2026-09-29.
+SIM_WIN = "this version can be won: "
+SIM_KEEP = "the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; "
+SIM_TEXT = {
+    "judge_win": 'Simulated judge: there is no API key, so no AI ran. This is the verdict a judge gives when it reads the program correctly: "{why}". A real judge is a model, and a model can be talked out of the right answer.',
+    "judge_keep": 'Simulated judge: there is no API key, so no AI ran. A judge that reads the program correctly lets this change through, because the maze stays unwinnable: "{why}". A real judge is a model, and a model can be talked out of the right answer.',
+    "prose_win": "Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would refuse this change, because this version can be won. A real AI reads that sentence as one line among many, and a request worded the right way can get past it.",
+    "prose_keep": 'Simulated: there is no API key, so no AI ran. An AI that follows the rule sentence would apply this change, because the maze stays unwinnable: "{why}". A real AI reads that sentence as one line among many, and a request worded the right way can get past it.',
+}
+SIM_LOG = {
+    "judge_win": 'simulated judge: rejected this program. there is no API key, so no AI ran; a judge that reads the program correctly says it can be won: "{why}".',
+    "judge_keep": 'simulated judge: passed. there is no API key, so no AI ran; a judge that reads the program correctly says the maze stays unwinnable: "{why}".',
+    "prose_win": "simulated (no API key, so no AI ran): not applied, because this version can be won.",
+    "prose_keep": "simulated (no API key, so no AI ran): applied, because the maze stays unwinnable.",
+}
 # the only error texts that name claude.ai: the claude.ai host raises these codes, a reader's own key never does
 HOSTED_ONLY = ("capability_disabled:'This viewer cannot call Claude from a page. Open the page in the claude.ai app.',",
                "session_expired:'Your claude.ai session expired. Sign in again and ask once more.',")
@@ -110,7 +124,7 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE=__BAD_SHAPE__, $=i
   $('keysave').addEventListener('click',()=>save($('keyinput').value));
   $('keyinput').addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); save($('keyinput').value); } });
   $('forgetkey').addEventListener('click',()=>forget());
-  return Object.freeze({init, save, forget, reject, sync}); })();
+  return Object.freeze({init, save, forget, reject, sync, isHosted:()=>hosted}); })();
 window.MazeKey=MazeKey;
 '''.replace("__ASK_MSG__", json.dumps(ASK_MSG)).replace("__BAD_SHAPE__", json.dumps(BAD_SHAPE))
 
@@ -122,16 +136,49 @@ TIMED_CALL = (
     "  let tm; return Promise.race([call(child.signal), new Promise((_,rej)=>{ tm=setTimeout(()=>{ rej({code:'timeout'}); child.abort(); }, ms); })])\n"
     "    .finally(()=>{ clearTimeout(tm); if(parent) parent.signal.removeEventListener('abort', link); }); }   // the timeout settles the race first, so its abort is never read as a Stop\n")
 
-# a writer round answered by a model other than Opus 5.5 (Anthropic's fallback, or its routing) gets one log line naming it
+# a writer round, judge call or Prose gate call answered by a model other than Opus 5.5 (Anthropic's fallback, or its routing) gets one log line
+# naming it; never on the claude.ai-hosted path, whose sample is not the key adapter
 MODEL_NOTE = (
     "function modelName(id){ const p=String(id).replace(/-\\d{8}$/,'').split('-'), w=p.filter(x=>!/^\\d+$/.test(x)), n=p.filter(x=>/^\\d+$/.test(x));\n"
     "  return w.map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' ')+(n.length?' '+n.join('.'):''); }   // claude-opus-4-8 -> Claude Opus 4.8\n"
-    "function modelNote(id){ if(typeof id!=='string'||!id||id==='claude-opus-5-5') return;\n"
-    "  logLine('think','this round was answered by '+modelName(id)+': Anthropic hands a request to it when Opus 5.5 declines.'); }\n")
+    "function modelNote(id, who){ if(MazeKey.isHosted()||typeof id!=='string'||!id||id==='claude-opus-5-5') return;\n"
+    "  logLine('think',(who||'this round')+' was answered by '+modelName(id)+', not Opus 5.5.'); }\n")
+
+# the simulated answers (no API key): one derivation, simWinnable, from the why line
+SIM_JS = (
+    "const SIM_WIN=" + json.dumps(SIM_WIN) + ", SIM_TEXT=" + json.dumps(SIM_TEXT) + ", SIM_LOG=" + json.dumps(SIM_LOG) + ";\n"
+    "function simWinnable(why){ return String(why||'').startsWith(SIM_WIN); }\n"
+    "function simKey(kind, why){ return kind+(simWinnable(why)?'_win':'_keep'); }\n"
+    "function simFill(s, why){ const q=String(why||'').replace(/\\.$/,''); return s.replace('{why}', ()=>q); }   // the why line, its closing full stop dropped\n"
+    "function simText(kind, why){ return simFill(SIM_TEXT[simKey(kind, why)], why); }\n"
+    "function simLog(kind, why){ return simFill(SIM_LOG[simKey(kind, why)], why); }\n")
 
 
 def fail(msg):
     sys.exit(f"FAILED: {msg}")
+
+
+def check_sim(t):
+    """The sentinel for the simulated answers: every canned change's why line has one of the two known shapes (so a new entry
+    cannot be simulated by accident), both shapes occur, and no repaired version reads as winnable."""
+    a = t.index("const QUICK = [\n")
+    block = t[a:t.index("\n];", a)]
+    ids = re.findall(r"\{id:'(\w+)'", block)
+    whys = [json.loads('"' + w + '"') for w in re.findall(r'why:"((?:[^"\\]|\\.)*)"', block)]
+    if not ids or len(ids) != len(whys):
+        fail(f"QUICK: {len(ids)} entries but {len(whys)} why lines")
+    for i, w in zip(ids, whys):
+        if w.startswith(SIM_WIN) == w.startswith(SIM_KEEP):
+            fail(f"QUICK {i}: the why line matches neither simulated shape (or both): {w!r}")
+    if not any(w.startswith(SIM_WIN) for w in whys) or not any(w.startswith(SIM_KEEP) for w in whys):
+        fail("QUICK: the why lines do not include both a winnable and an unwinnable change")
+    a = t.index("const REPAIR_WHY = {\n")
+    reps = re.findall(r'^ (\w+): "((?:[^"\\]|\\.)*)",$', t[a:t.index("\n};", a)], flags=re.M)
+    if len(reps) != len(re.findall(r"^ (\w+):", t[a:t.index("\n};", a)], flags=re.M)) or not reps:
+        fail("REPAIR_WHY: could not read every entry")
+    for i, w in reps:
+        if w.startswith(SIM_WIN):
+            fail(f"REPAIR_WHY {i}: a repaired version reads as winnable")
 
 
 def rep(text, old, new, count, label):
@@ -186,13 +233,13 @@ def main():
     # 4b. every other reader-visible string that assumed the claude.ai viewer now points at the key box
     t = rep(t, "each round is one call on your claude.ai account, about half a minute.",
             "each round is one call on your API key, about half a minute.", 2, "round cost")
-    t = rep(t, "now.why='Prose needs the AI, and this viewer has none. Nothing applied.';",
-            "now.why=" + json.dumps(NEEDS_KEY_PROSE) + ";", 1, "Prose without the AI")
     t = rep(t, "now.why+=(pre.length?' The page\\u2019s own repaired version was rejected too, and this viewer has no AI to go on with.':' This viewer has no AI.')+' Open the page in the claude.ai app and the AI keeps the request and finds another way to hold the rule.';",
             "now.why+=(pre.length?' The page\\u2019s own repaired version was rejected too, and the AI needs a key to go on.':' The AI needs a key to go on.')+' Paste an Anthropic API key in the Ask tab and the AI keeps the request and finds another way to hold the rule.';",
             1, "caught without the AI")
     t = rep(t, "const saidWinnable=!!(verdict&&verdict.winnable); const reason=String(verdict ? (verdict.reason||'(no reason given)') : 'no viewer, so no judge; the change was let through unjudged').slice(0,240);",
-            "if(!verdict){ logLine('ok',"+ json.dumps(NO_JUDGE_LOG) + "); return acceptOffer(how+' '+" + json.dumps(NO_JUDGE_CARD) + ", how+' '+" + json.dumps(NO_JUDGE_CARD) + "); }   // no key, so no judge ran: say so, never as a verdict\n"
+            "if(!verdict){ const w=ctx.whyLine;   // no key: the simulated verdict, from the change's own why line\n"
+            "      if(simWinnable(w)){ logLine('no', simLog('judge', w)+stands); return reject('the judge said the game can be won: '+w, simText('judge', w), 'judge'); }\n"
+            "      logLine('ok', simLog('judge', w)); const said=how+' '+simText('judge', w); return acceptOffer(said, said); }\n"
             "    const saidWinnable=!!verdict.winnable; const reason=String(verdict.reason||'(no reason given)').slice(0,240);",
             1, "Judge without a key")
 
@@ -216,20 +263,41 @@ def main():
             "    no_credit:'Your Anthropic account has no credit left. Add credit at platform.claude.com/settings/billing, then ask again.',\n",
             1, "T invalid_request")
     t = rep(t, "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request'];",
-            TIMED_CALL + MODEL_NOTE + "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request','bad_key','permission','no_credit'];",
+            TIMED_CALL + MODEL_NOTE + SIM_JS + "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request','bad_key','permission','no_credit'];",
             1, "GATE_PASS")
     # 9. Judge and Prose: each call gets a child controller linked to ctl; the timeout aborts only the child and keeps each path's own behaviour
     t = rep(t, "const askJudge=async()=>{ let tm; try{ const v=await Promise.race([sampleNs.json(judgePrompt(src, say||how), { signal: ctl?ctl.signal:undefined, cache:false, modelTier:'complex' }), new Promise((_,rej)=>{ tm=setTimeout(()=>rej({code:'timeout'}), judgeMs()); })]); return (v&&typeof v==='object'&&typeof v.winnable==='boolean') ? {v} : {err:'unreadable reply'}; }catch(e){ if(e&&e.code==='cancelled') throw e; return {err:String((e&&e.code)||'error')}; }finally{ clearTimeout(tm); } };",
-            "const askJudge=async()=>{ try{ const v=await timedCall(signal=>sampleNs.json(judgePrompt(src, say||how), { signal, cache:false, modelTier:'complex' }), judgeMs()); return (v&&typeof v==='object'&&typeof v.winnable==='boolean') ? {v} : {err:'unreadable reply'}; }catch(e){ if(e&&(e.code==='cancelled'||KEY_STOP.includes(e.code))) throw e; return {err:String((e&&e.code)||'error')}; } };",
+            "const askJudge=async()=>{ try{ let m=null; const v=await timedCall(signal=>sampleNs.json(judgePrompt(src, say||how), { signal, cache:false, modelTier:'complex', onModel:x=>{ m=x; } }), judgeMs()); modelNote(m, 'the judge call'); return (v&&typeof v==='object'&&typeof v.winnable==='boolean') ? {v} : {err:'unreadable reply'}; }catch(e){ if(e&&(e.code==='cancelled'||KEY_STOP.includes(e.code))) throw e; return {err:String((e&&e.code)||'error')}; } };",
             1, "Judge call")
     t = rep(t, "{ let tm; try{ g=await Promise.race([sampleNs.json(proseGatePrompt(opts.gate), { signal: ctl.signal, cache:false, modelTier:'complex' }), new Promise((_,rej)=>{ tm=setTimeout(()=>rej({code:'timeout'}), judgeMs()); })]); }\n"
                "        catch(e){ if(e&&(e.code==='cancelled'||GATE_PASS.includes(e.code))) throw e; noAnswer=gateReason(e&&e.code); } finally{ clearTimeout(tm); } }",
-            "{ try{ g=await timedCall(signal=>sampleNs.json(proseGatePrompt(opts.gate), { signal, cache:false, modelTier:'complex' }), judgeMs()); }\n"
+            "{ try{ let m=null; g=await timedCall(signal=>sampleNs.json(proseGatePrompt(opts.gate), { signal, cache:false, modelTier:'complex', onModel:x=>{ m=x; } }), judgeMs()); modelNote(m, 'the call on whether to apply it'); }\n"
             "        catch(e){ if(e&&(e.code==='cancelled'||GATE_PASS.includes(e.code))) throw e; noAnswer=gateReason(e&&e.code); } }",
             1, "Prose gate call")
     t = rep(t, "send.disabled=true; send.dataset.off='1'; showCanned(); } }\n  }finally{ finishRequest(my);",
             "send.disabled=true; send.dataset.off='1'; showCanned(); }\n      if(e&&KEY_STOP.includes(e.code)) MazeKey.reject(e.code); }\n  }finally{ finishRequest(my);",
             1, "top-level error handler")
+
+    # 9a. no key: the simulated Judge and Prose answers (the texts in SIM_TEXT); the judge's "reading" lines only when a judge is asked
+    t = rep(t, "if(mode==='judge'){ status.textContent='the judge (Opus) is reading the program\\u2026'; logLine('think','the judge (Opus) is reading the program\\u2026'); costNote('ask'); let verdict=null, silent='';",
+            "if(mode==='judge'){ if(sampleNs){ status.textContent='the judge (Opus) is reading the program\\u2026'; logLine('think','the judge (Opus) is reading the program\\u2026'); costNote('ask'); } let verdict=null, silent='';",
+            1, "Judge reading lines")
+    t = rep(t, "      status.textContent='asking the AI whether to apply it\\u2026'; logLine('think','asking Opus whether to apply it. the only thing in its way is one sentence.');\n"
+               "      if(!sampleNs){ now.why='Prose needs the AI, and this viewer has none. Nothing applied.'; quizState='ask'; renderCard(); return; }\n",
+            "      if(!sampleNs){ const w=opts.gate.why;   // no key: the simulated answer, from the change's own why line\n"
+            "        logLine(simWinnable(w)?'no':'ok', simLog('prose', w));\n"
+            "        if(simWinnable(w)){ now.say=''; now.why='You picked \"'+opts.gate.name+'\". '+simText('prose', w); quizState='ask'; renderCard(); return; }\n"
+            "        pre[0].sim=simText('prose', w); }\n"
+            "      else { status.textContent='asking the AI whether to apply it\\u2026'; logLine('think','asking Opus whether to apply it. the only thing in its way is one sentence.');\n",
+            1, "Prose gate without a key")
+    t = rep(t, "      pre[0].say=say; }\n    for(let i=0;i<pre.length;i++){",
+            "      pre[0].say=say; } }\n    for(let i=0;i<pre.length;i++){", 1, "Prose gate block end")
+    t = rep(t, "const r=await enforce(c.src, c.say||'', c.how, ctx(true, {whyLine:c.why, from:'page'}));",
+            "const r=await enforce(c.src, c.say||'', c.how, ctx(true, {whyLine:c.why, from:'page', sim:c.sim}));", 1, "pre ctx sim")
+    t = rep(t, "if(mode==='nothing'||mode==='prose'){ logLine('ok','applied. nobody checked it.'); return acceptOffer(how+(mode==='prose'?",
+            "if(mode==='nothing'||mode==='prose'){ logLine('ok','applied. nobody checked it.'); if(ctx.sim) return acceptOffer(how+' '+ctx.sim, how+' '+ctx.sim); return acceptOffer(how+(mode==='prose'?",
+            1, "Prose simulated accept")
+    check_sim(t)
 
     # 9b. the writer's instruction, reworded; and the serving model reported after each writer round
     t = rep(t, WRITER_OLD, WRITER_NEW, 1, "writer instruction")
