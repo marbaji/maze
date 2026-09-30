@@ -25,8 +25,7 @@ CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 
        "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; "
        "connect-src https://api.anthropic.com")
 POST_URL = "https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281"
-ASK_MSG = ("To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only "
-           "sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.")
+ASK_MSG = 'To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the "Canned changes" mode, which are saved ready-made changes that run without an API key.'
 BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-."
 
 # the writer's instruction to build the request as asked; the earlier wording ("You never refuse and you never substitute: ...")

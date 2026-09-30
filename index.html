@@ -1883,7 +1883,7 @@ function noteWait(){ const key=(quizState==='more'||quizState==='longer')?quizSt
 function setTab(t){ askMode=t; document.getElementById('tabQuick').className=t==='quick'?'on':''; document.getElementById('tabFree').className=t==='free'?'on':''; document.getElementById('quickPane').hidden=t!=='quick'; document.getElementById('freePane').hidden=t!=='free'; document.getElementById('reset').hidden=(t==='quick'); }   // the canned pane carries its own Reset above the changes; on the free tab Reset sits on the Ask row after Stop (v40)
 // v40 (Mo, 2026-09-28: "hide canned changes from default, and only if the user doesn't connect their claude then it shows"): the Canned changes tab is hidden
 // until the page learns Claude cannot be used here (a declined permission, or a request refused for access), and a line under the tabs says why
-const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.";
+const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 function cannedShown(){ return !document.getElementById('tabQuick').hidden; }
 function showCanned(){ if(cannedShown()) return; document.getElementById('tabQuick').hidden=false; const n=document.getElementById('cannedwhy'); n.textContent=CANNED_WHY; n.hidden=false; renderPos(); }
 document.getElementById('tabQuick').onclick=()=>setTab('quick'); document.getElementById('tabFree').onclick=()=>{ setTab('free'); permNote(); };
@@ -2092,7 +2092,7 @@ const costSaidKeys=new Set(); function costNote(kind){ const key=kind==='write'?
 let sampleNs=null, ctl=null, pendingApprove=null;
 // ---- the reader's own Anthropic key (the play page): MazeKey owns the key; one function per transition, each ending in sync(), which sets the key box,
 // Send and the capnote from state alone. init() is the one entry point: it runs after capability discovery and returns what sampleNs becomes
-const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.";
+const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.", $=id=>document.getElementById(id);
   let mem=null, hosted=false, blocked=false, err='';   // mem: the key when sessionStorage throws (this visit only); blocked: no credit on the key in use
   const stored=()=>{ try{ const v=sessionStorage.getItem(SK); if(v) return v; }catch(e){} return mem; };

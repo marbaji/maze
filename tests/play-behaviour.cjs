@@ -20,7 +20,7 @@ const API = 'https://api.anthropic.com/v1/messages', SAPI = `${SORIGIN}/v1/messa
 const COPY = '.play-stream-copy.html';
 const COPY_JUDGE_MS = 8000;   // a CI runner is slower than a laptop: Stop and Forget are given 3 s to act, well inside this
 const KEY = 'sk-ant-api03-testQNoA', KEY2 = 'sk-ant-api03-testN3W1';   // fake, short: never a real key
-const ASK_MSG = 'To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.';
+const ASK_MSG = "To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 const BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.";
 const T = {
   bad_key: 'Anthropic rejected this key. Check it was copied whole, or create a new one, then paste it again.',
