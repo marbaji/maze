@@ -1,5 +1,7 @@
 (function (root) {
   const API = 'https://api.anthropic.com/v1/messages', MODEL = 'claude-opus-5-5';
+  const FALLBACK = false;   // Anthropic's server-side fallback (a declined request is finished by another model); build/make-play-page.py sets it from USE_FALLBACK
+  const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
   const clean = s => String(s || '').trim();
   const looksLikeAnthropicKey = s => /^sk-ant-[A-Za-z0-9_-]{8,}$/.test(clean(s));
   const maskKey = s => '····' + clean(s).slice(-4);
@@ -35,29 +37,35 @@
       end() { return out.splice(0); } // a trailing event without its blank line is discarded, per the spec
     };
   }
-  function makeKeySample({ key, fetchImpl }) {
+  function makeKeySample({ key, fetchImpl, fallback }) {
     const k = clean(key); const doFetch = fetchImpl || ((...a) => root.fetch(...a));
+    const useFallback = fallback === undefined ? FALLBACK : !!fallback;
     async function sample(input, opts = {}) {
       const sig = opts.signal;
       if (sig && sig.aborted) throw fail('cancelled', 'Stopped.');
       const messages = typeof input === 'string' ? [{ role: 'user', content: input }] : input;
       let res;
       try {
-        res = await doFetch(API, { method: 'POST', signal: sig, headers: { 'content-type': 'application/json', 'x-api-key': k,
-          'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-          body: JSON.stringify({ model: MODEL, max_tokens: 16000, stream: true, output_config: { effort: 'medium' }, messages }) });
+        const headers = { 'content-type': 'application/json', 'x-api-key': k,
+          'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+        const body = { model: MODEL, max_tokens: 16000, stream: true, output_config: { effort: 'medium' }, messages };
+        if (useFallback) { headers['anthropic-beta'] = FALLBACK_BETA; body.fallbacks = 'default'; }
+        res = await doFetch(API, { method: 'POST', signal: sig, headers, body: JSON.stringify(body) });
       } catch (e) { throw (sig && sig.aborted) ? fail('cancelled', 'Stopped.') : fail('upstream_error', 'Could not reach Anthropic.'); }
       if (!res.ok) { let t = '', m = ''; try { const j = await res.json(); t = j.error.type; m = j.error.message; } catch (e) {}
         throw fail(codeFor(t, res.status, m), m || ('HTTP ' + res.status)); }
       if (!res.body) throw fail('upstream_error', 'The answer arrived empty.');
       const reader = res.body.getReader(), dec = new TextDecoder(), sse = parseSSE();
-      let text = '', stop = null, done = false, started = false;
+      let text = '', stop = null, done = false, started = false, model = null;
+      const served = m => { if (typeof m !== 'string' || !m || m === model) return; model = m;   // the model answering now: message_start names it, a fallback block hands over
+        if (typeof opts.onModel === 'function') opts.onModel(m); };
       const handle = e => {
         let d; try { d = JSON.parse(e.data); } catch (x) { throw fail('upstream_error', 'The answer arrived garbled.', text); }
         if (d.type === 'content_block_delta' && d.delta && d.delta.type === 'text_delta') {
           if (sig && sig.aborted) return; text += d.delta.text;
           if (typeof opts.onText === 'function') opts.onText({ text, delta: d.delta.text });
-        } else if (d.type === 'message_start') started = true;
+        } else if (d.type === 'message_start') { started = true; served(d.message && d.message.model); }
+        else if (d.type === 'content_block_start' && d.content_block && d.content_block.type === 'fallback') served(d.content_block.to && d.content_block.to.model);   // no deltas follow; the next model continues the text
         else if (d.type === 'message_delta' && d.delta) stop = d.delta.stop_reason || stop;
         else if (d.type === 'message_stop') done = true;
         else if (d.type === 'error') { const er = d.error || {}; throw fail(codeFor(er.type, 0, er.message), er.message || 'Stream error', text); }
@@ -77,8 +85,8 @@
       }
       if (!done || !started || !stop) throw fail('upstream_error', 'The answer stopped early.', text);
       if (!text && stop === 'end_turn') throw fail('empty_completion', 'Claude sent an empty answer.');
-      if (stop === 'refusal') throw fail('refused', 'Claude declined this request.', text);
-      return { text, truncated: stop === 'max_tokens' || stop === 'model_context_window_exceeded', modelTierApplied: 'complex' };
+      if (stop === 'refusal') { const e = fail('refused', 'Claude declined this request.', text); if (model) e.servedModel = model; throw e; }
+      return { text, truncated: stop === 'max_tokens' || stop === 'model_context_window_exceeded', modelTierApplied: 'complex', servedModel: model };
     }
     sample.json = async (input, opts = {}) => {
       const { text } = await sample(input, opts);

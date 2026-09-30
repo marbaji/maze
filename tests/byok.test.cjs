@@ -5,7 +5,19 @@ const path = require('path');
 let unhandled = null;
 process.on('unhandledRejection', (e) => { unhandled = e || new Error('unhandled rejection'); console.error('UNHANDLED REJECTION', e); process.exit(1); });
 
+const fs = require('fs');
 const { makeKeySample, looksLikeAnthropicKey, maskKey, parseSSE } = require(path.join(__dirname, '..', 'src', 'byok.js'));
+// the adapter as shipped: the copy inlined into index.html, whose FALLBACK the builder set from USE_FALLBACK
+const built = (() => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const a = html.indexOf("(function (root) {\n  const API = "), end = "})(typeof window !== 'undefined' ? window : globalThis);";
+  const b = html.indexOf(end, a);
+  assert(a >= 0 && b > a, 'index.html: the inlined adapter was not found');
+  const mod = { exports: {} };
+  new Function('module', html.slice(a, b + end.length))(mod);
+  assert.strictEqual(typeof mod.exports.makeKeySample, 'function', 'index.html: the inlined adapter did not load');
+  return mod.exports;
+})();
 
 const enc = new TextEncoder();
 const KEY = 'sk-ant-api03-testQNoA';
@@ -55,10 +67,10 @@ t('1 key helpers', async () => {
   assert.strictEqual(maskKey(' sk-ant-api03-xyzQNoA '), '····QNoA');
 });
 
-t('2 request shape', async () => {
+for (const [label, mk] of [['src/byok.js', makeKeySample], ['index.html', built.makeKeySample]]) t('2 request shape, fallback off (' + label + ')', async () => {
   let seen;
   const f = async (url, init) => { seen = { url, init }; return streamRes([HAPPY]); };
-  await makeKeySample({ key: '  ' + KEY + '\n', fetchImpl: f })('hi');
+  await mk({ key: '  ' + KEY + '\n', fetchImpl: f })('hi');
   assert.strictEqual(seen.url, 'https://api.anthropic.com/v1/messages');
   assert.strictEqual(seen.init.method, 'POST');
   assert.deepStrictEqual(seen.init.headers, {
@@ -73,7 +85,16 @@ t('2 request shape', async () => {
   assert.strictEqual(body.max_tokens, 16000);
   assert.deepStrictEqual(body.output_config, { effort: 'medium' });
   assert.deepStrictEqual(body.messages, [{ role: 'user', content: 'hi' }]);
-  for (const k of ['thinking', 'temperature', 'budget_tokens']) assert(!(k in body), k + ' must be absent');
+  for (const k of ['thinking', 'temperature', 'budget_tokens', 'fallbacks']) assert(!(k in body), k + ' must be absent');
+});
+
+t('2b request shape, fallback on', async () => {
+  let seen;
+  const f = async (url, init) => { seen = { url, init }; return streamRes([HAPPY]); };
+  await makeKeySample({ key: KEY, fetchImpl: f, fallback: true })('hi');
+  assert.strictEqual(seen.init.headers['anthropic-beta'], 'server-side-fallback-2026-07-01');
+  assert.strictEqual(JSON.parse(seen.init.body).fallbacks, 'default');
+  for (const h of ['content-type', 'x-api-key', 'anthropic-version', 'anthropic-dangerous-direct-browser-access']) assert(h in seen.init.headers, h + ' must stay');
 });
 
 t('3 happy stream', async () => {
@@ -255,6 +276,39 @@ t('14 a DOMException mid-stream is an upstream error, not rethrown', async () =>
   });
   assert.strictEqual(typeof new DOMException('x', 'NetworkError').code, 'number', 'premise: a DOMException has a numeric code');
   await rejects(makeKeySample({ key: KEY, fetchImpl: f })('hi'), 'upstream_error', (e) => assert.strictEqual(e.text, 'part'));
+});
+
+const startAs = (model) => ev('message_start', { type: 'message_start', message: { id: 'msg_f', role: 'assistant', model, content: [] } });
+const fbBlock = (i, from, to) => ev('content_block_start', { type: 'content_block_start', index: i, content_block: { type: 'fallback', from: { model: from }, to: { model: to } } }) +
+  ev('content_block_stop', { type: 'content_block_stop', index: i });
+const textAt = (i, parts) => ev('content_block_start', { type: 'content_block_start', index: i, content_block: { type: 'text', text: '' } }) +
+  parts.map((p) => ev('content_block_delta', { type: 'content_block_delta', index: i, delta: { type: 'text_delta', text: p } })).join('') +
+  ev('content_block_stop', { type: 'content_block_stop', index: i });
+const end = stopDelta('end_turn') + stopMsg;
+
+t('10b serving model', async () => {
+  // Opus 5.5 answers: servedModel names it, onModel once
+  let seen = [];
+  let r = await run([startAs('claude-opus-5-5') + textAt(0, ['Hi']) + end], { onModel: (m) => seen.push(m) });
+  assert.strictEqual(r.servedModel, 'claude-opus-5-5'); assert.deepStrictEqual(seen, ['claude-opus-5-5']);
+  // declined before any output: message_start names the fallback model and the first block is a fallback block
+  seen = [];
+  r = await run([startAs('claude-opus-4-8') + fbBlock(0, 'claude-opus-5-5', 'claude-opus-4-8') + textAt(1, ['Made ', 'it.']) + end], { onModel: (m) => seen.push(m) });
+  assert.strictEqual(r.text, 'Made it.'); assert.strictEqual(r.servedModel, 'claude-opus-4-8'); assert.deepStrictEqual(seen, ['claude-opus-4-8']);
+  // declined mid-output: the open text block closes, a fallback pair marks the boundary, the fallback model continues the partial text
+  seen = []; const texts = [];
+  r = await run([startAs('claude-opus-5-5') + textAt(0, ['SAY: half ']) + fbBlock(1, 'claude-opus-5-5', 'claude-opus-4-8') + textAt(2, ['and the rest.']) + end],
+    { onModel: (m) => seen.push(m), onText: (x) => texts.push(x.text) });
+  assert.strictEqual(r.text, 'SAY: half and the rest.');
+  assert.strictEqual(r.servedModel, 'claude-opus-4-8');
+  assert.deepStrictEqual(seen, ['claude-opus-5-5', 'claude-opus-4-8']);
+  assert.deepStrictEqual(texts, ['SAY: half ', 'SAY: half and the rest.']);
+  // no model named at all: null, and onModel never called
+  seen = [];
+  r = await run([HAPPY], { onModel: (m) => seen.push(m) });
+  assert.strictEqual(r.servedModel, null); assert.deepStrictEqual(seen, []);
+  // a refusal carries the model that declined, when known
+  await rejects(run([startAs('claude-opus-5-5') + textAt(0, ['no']) + stopDelta('refusal') + stopMsg]), 'refused', (e) => assert.strictEqual(e.servedModel, 'claude-opus-5-5'));
 });
 
 t('11 json', async () => {

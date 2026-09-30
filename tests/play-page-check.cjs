@@ -2,6 +2,7 @@
 // Structure check of the play page: node tests/play-page-check.cjs <file>   (file relative to the repo root; default index.html)
 // Serves the repo with python3 -m http.server 8765 and loads the page in Chromium at 1280x900 and 390x844.
 // PLAYWRIGHT_PATH (optional) points at a playwright install; CHROME (optional) at a Chromium binary.
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -76,6 +77,13 @@ async function structure(page, width) {
   check(s.cspInHead, 'CSP meta is not in the document head' + at);
   check(s.offOrigin.length === 0, `off-origin script/link: ${s.offOrigin.join(' | ')}` + at);
   check(s.scrollW <= s.clientW, `body scrolls sideways: scrollWidth ${s.scrollW} > clientWidth ${s.clientW}` + at);
+}
+
+// the writer's instruction: the reworded sentence ships, the jailbreak-shaped one (declined by Opus 5.5 as cyber) does not
+{
+  const src = fs.readFileSync(path.join(ROOT, FILE), 'utf8');
+  check(src.split('Build what the player asks for, as asked.').length - 1 === 1, 'the writer prompt does not hold "Build what the player asks for, as asked." exactly once');
+  check(!/you never refuse/i.test(src) && !/never substitute/i.test(src), 'the page still tells the writer "You never refuse and you never substitute"');   // a code comment elsewhere says the page never refuses; that is not the prompt
 }
 
 (async () => {

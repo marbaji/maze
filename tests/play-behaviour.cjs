@@ -41,13 +41,15 @@ const GATE_TEXT = '{"apply": true, "say": "Applied as asked."}';
 
 // ---- Anthropic's streaming format
 const ev = (name, obj) => `event: ${name}\ndata: ${JSON.stringify(obj)}\n\n`;
-const sseStart = ev('message_start', { type: 'message_start', message: { id: 'msg_t', role: 'assistant', content: [] } }) +
+const sseStartAs = (model) => ev('message_start', { type: 'message_start', message: Object.assign({ id: 'msg_t', role: 'assistant', content: [] }, model ? { model } : {}) }) +
   ev('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } });
+const sseStart = sseStartAs(null);
 const sseDelta = (t) => ev('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } });
 const sseEnd = ev('content_block_stop', { type: 'content_block_stop', index: 0 }) +
   ev('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: 9 } }) +
   ev('message_stop', { type: 'message_stop' });
-const sse = (text) => sseStart + sseDelta(text.slice(0, 20)) + sseDelta(text.slice(20)) + sseEnd;
+const sse = (text, model) => sseStartAs(model) + sseDelta(text.slice(0, 20)) + sseDelta(text.slice(20)) + sseEnd;
+const MODEL_LINE = /this round was answered by /;
 const kindOf = (body) => { const c = (((body || {}).messages || [])[0] || {}).content || ''; return /You are a referee/.test(c) ? 'judge' : /ready-made change/.test(c) ? 'gate' : 'writer'; };
 const OK_ANSWER = { writer: WRITER_TEXT, judge: JUDGE_TEXT, gate: GATE_TEXT };
 
@@ -107,7 +109,8 @@ async function open(opts = {}) {
   if (opts.init) await context.addInitScript(opts.init);
   const page = await context.newPage();
   const file = opts.copy ? COPY : 'index.html';
-  const failed = [];
+  const failed = [], consoleErrors = [];
+  page.on('console', (m) => { if (m.type() === 'error' && !/\/favicon\.ico$/.test(m.location().url || '')) consoleErrors.push(m.text()); });   // the static server has no favicon; nothing else may log an error
   page.on('pageerror', (e) => failures.push(`page error (${opts.name || file}): ${e.message}`));
   context.on('request', (r) => allRequests.push({ r, copy: !!opts.copy }));
   page.on('requestfailed', (r) => failed.push({ url: r.url(), error: (r.failure() || {}).errorText || '' }));
@@ -120,14 +123,14 @@ async function open(opts = {}) {
       routed.push(rec);
       const a = (opts.answers && opts.answers[kind] && opts.answers[kind].shift()) || 'ok';
       const cors = { 'access-control-allow-origin': '*' };
-      if (a === 'ok') return route.fulfill({ status: 200, headers: Object.assign({ 'content-type': 'text/event-stream' }, cors), body: sse(OK_ANSWER[kind]) });
+      if (a === 'ok' || /^claude-/.test(a)) return route.fulfill({ status: 200, headers: Object.assign({ 'content-type': 'text/event-stream' }, cors), body: sse(OK_ANSWER[kind], a === 'ok' ? null : a) });   // a model id: message_start names it
       const e = ERR[a];
       return route.fulfill({ status: e.status, headers: Object.assign({ 'content-type': 'application/json' }, cors), body: JSON.stringify({ type: 'error', error: { type: e.type, message: e.message } }) });
     });
   }
   await page.goto(`${ORIGIN}/${file}${opts.hash || ''}`, { waitUntil: 'load' });
   await ready(page);
-  return { context, page, failed };
+  return { context, page, failed, consoleErrors };
 }
 
 // the page is ready once its opening check has finished: it clears the log, writes its start line and resets the switch
@@ -236,6 +239,8 @@ async function case4() {
   check(r.headers['anthropic-version'] === '2023-06-01', 'case 4: anthropic-version header');
   check(r.headers['anthropic-dangerous-direct-browser-access'] === 'true', 'case 4: direct browser access header');
   check(r.body.model === 'claude-opus-5-5' && r.body.stream === true, `case 4: body model ${r.body.model}, stream ${r.body.stream}`);
+  check(!('anthropic-beta' in r.headers) && !('fallbacks' in r.body), `case 4: the shipped page asked for the server-side fallback (anthropic-beta ${JSON.stringify(r.headers['anthropic-beta'])}, fallbacks ${JSON.stringify(r.body.fallbacks)})`);
+  check(!MODEL_LINE.test(log), 'case 4: a serving-model line with no model named:\n' + log);
   check((await state(page)).send === false, 'case 4: Send is not enabled after the answer');
   await context.close();
 }
@@ -246,7 +251,7 @@ const aborted = (failed) => failed.some((f) => f.url === SAPI && /ABORT/i.test(f
 
 async function case5() {
   stream.reqs = []; stream.plan.writer = [{ how: 'hold', first: 'SAY: first words ' }];
-  const { context, page, failed } = await open({ copy: true, name: 'case 5' });
+  const { context, page, failed, consoleErrors } = await open({ copy: true, name: 'case 5' });
   await saveKey(page, KEY);
   await ask(page, 'make a small different game with a door');
   const rec = await arrived('writer', 1);
@@ -262,6 +267,7 @@ async function case5() {
   await sleep(600);
   const after = (await state(page)).log;
   check(after === before && !/MORE TEXT AFTER STOP/.test(after), 'case 5: text arrived after Stop:\nBEFORE ' + before.slice(-300) + '\nAFTER ' + after.slice(-300));
+  check(consoleErrors.length === 0, 'case 5: Stop logged console errors: ' + JSON.stringify(consoleErrors));
   await context.close();
 }
 
@@ -323,7 +329,7 @@ async function case7() {
     for (const action of ['stop', 'forget']) {
       const at = `case 7 (${action} during the ${kind} call)`;
       stream.reqs = []; stream.plan = { writer: [], judge: [], gate: [] }; stream.plan[kind] = [{ how: 'hold' }];
-      const { context, page, failed } = await open({ copy: true, name: at });
+      const { context, page, failed, consoleErrors } = await open({ copy: true, name: at });
       await saveKey(page, KEY);
       if (mode !== 'Code (proof)') await setMode(page, mode);
       if (how === 'ask') await ask(page, 'make a small different game with a door'); else await canned(page, 0);
@@ -338,6 +344,8 @@ async function case7() {
       check(rec.closed, `${at}: the server still holds the connection`);
       await idle(page);
       const s = await state(page);
+      await sleep(300);
+      check(consoleErrors.length === 0, `${at}: console errors: ${JSON.stringify(consoleErrors)}`);
       if (action === 'stop') check(/Stopped\./.test(s.card) && /stopped\./.test(s.log), `${at}: no cancelled state`);
       else {
         check(!Object.values(s.ss).some((v) => /sk-ant/.test(v)) && !s.keystate, `${at}: the key was not cleared`);
@@ -456,6 +464,26 @@ async function case7b() {
   }
 }
 
+async function case11() {
+  // the serving model: a writer round answered by claude-opus-4-8 gets one log line naming it; an Opus 5.5 round gets none
+  for (const [model, want] of [['claude-opus-4-8', true], ['claude-opus-5-5', false]]) {
+    routed = [];
+    const at = `case 11 (${model})`;
+    const { context, page } = await open({ name: at, answers: { writer: [model] } });
+    await saveKey(page, KEY);
+    await ask(page, 'make a small different game with a door');
+    await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, at + ' ask');
+    const log = (await state(page)).log;
+    check(routed.length === 1 && routed[0].kind === 'writer', `${at}: premise: expected one writer call, got ${routed.map((r) => r.kind).join(',')}`);
+    check(/AI: Made a small five by five game/.test(log), `${at}: premise: the answer is not in the log`);
+    const lines = log.split('\n').filter((l) => MODEL_LINE.test(l));
+    if (want) check(lines.length === 1 && lines[0] === 'this round was answered by Claude Opus 4.8: Anthropic hands a request to it when Opus 5.5 declines.', `${at}: model lines ${JSON.stringify(lines)}`);
+    else check(lines.length === 0 && !/Claude Opus/.test(log), `${at}: model lines on an Opus 5.5 round ${JSON.stringify(lines)}`);
+    check(!/\u2014/.test(lines.join('')), `${at}: an em dash in the model line`);
+    await context.close();
+  }
+}
+
 async function case8() {
   const { context, page } = await open({ name: 'case 8', hash: '#read-play' });
   await sleep(500);
@@ -519,7 +547,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/index.html')).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;

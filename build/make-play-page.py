@@ -17,6 +17,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "build" / "input" / "game-public.html"
 BYOK = ROOT / "src" / "byok.js"
 
+# Anthropic's server-side fallback: when True, the shipped adapter asks for it (header anthropic-beta and body fallbacks:"default"),
+# so a request Opus 5.5 declines is finished by the fallback model on the same stream. The one switch; the page reports the serving model either way.
+USE_FALLBACK = False
+
 CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; "
        "style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; "
        "connect-src https://api.anthropic.com")
@@ -24,6 +28,11 @@ POST_URL = "https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructi
 ASK_MSG = ("To use Ask anything, paste an Anthropic API key below. It stays in your browser and is only "
            "sent to Anthropic. Until then, use Canned changes: ready-made changes that run without Claude.")
 BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-."
+
+# the writer's instruction to build the request as asked; the earlier wording ("You never refuse and you never substitute: ...")
+# read as a jailbreak and was declined as cyber by Opus 5.5
+WRITER_OLD = "You never refuse and you never substitute: if the player asks for something, build that thing."
+WRITER_NEW = "Build what the player asks for, as asked."
 
 NEEDS_KEY_PROSE = "Prose needs the AI, which runs once you paste an Anthropic API key in the Ask tab. Nothing applied."
 NO_JUDGE_CARD = "No judge ran, because there is no API key, so the change was let through unjudged."
@@ -113,6 +122,13 @@ TIMED_CALL = (
     "  let tm; return Promise.race([call(child.signal), new Promise((_,rej)=>{ tm=setTimeout(()=>{ rej({code:'timeout'}); child.abort(); }, ms); })])\n"
     "    .finally(()=>{ clearTimeout(tm); if(parent) parent.signal.removeEventListener('abort', link); }); }   // the timeout settles the race first, so its abort is never read as a Stop\n")
 
+# a writer round answered by a model other than Opus 5.5 (Anthropic's fallback, or its routing) gets one log line naming it
+MODEL_NOTE = (
+    "function modelName(id){ const p=String(id).replace(/-\\d{8}$/,'').split('-'), w=p.filter(x=>!/^\\d+$/.test(x)), n=p.filter(x=>/^\\d+$/.test(x));\n"
+    "  return w.map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' ')+(n.length?' '+n.join('.'):''); }   // claude-opus-4-8 -> Claude Opus 4.8\n"
+    "function modelNote(id){ if(typeof id!=='string'||!id||id==='claude-opus-5-5') return;\n"
+    "  logLine('think','this round was answered by '+modelName(id)+': Anthropic hands a request to it when Opus 5.5 declines.'); }\n")
+
 
 def fail(msg):
     sys.exit(f"FAILED: {msg}")
@@ -184,6 +200,7 @@ def main():
     t = rep(t, '<div class="note" id="capnote"></div>', '<div class="note" id="capnote"></div>' + KEYBOX, 1, "capnote div")
 
     # 6. byok.js inline, before the game's main script
+    byok = rep(byok, "const FALLBACK = false;", "const FALLBACK = " + ("true" if USE_FALLBACK else "false") + ";", 1, "adapter FALLBACK")
     t = rep(t, "</div>\n\n<script>\n(() => {\n'use strict';",
             "</div>\n\n<script>\n" + byok.rstrip("\n") + "\n</script>\n<script>\n(() => {\n'use strict';", 1, "main script start")
 
@@ -199,7 +216,7 @@ def main():
             "    no_credit:'Your Anthropic account has no credit left. Add credit at platform.claude.com/settings/billing, then ask again.',\n",
             1, "T invalid_request")
     t = rep(t, "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request'];",
-            TIMED_CALL + "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request','bad_key','permission','no_credit'];",
+            TIMED_CALL + MODEL_NOTE + "const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request','bad_key','permission','no_credit'];",
             1, "GATE_PASS")
     # 9. Judge and Prose: each call gets a child controller linked to ctl; the timeout aborts only the child and keeps each path's own behaviour
     t = rep(t, "const askJudge=async()=>{ let tm; try{ const v=await Promise.race([sampleNs.json(judgePrompt(src, say||how), { signal: ctl?ctl.signal:undefined, cache:false, modelTier:'complex' }), new Promise((_,rej)=>{ tm=setTimeout(()=>rej({code:'timeout'}), judgeMs()); })]); return (v&&typeof v==='object'&&typeof v.winnable==='boolean') ? {v} : {err:'unreadable reply'}; }catch(e){ if(e&&e.code==='cancelled') throw e; return {err:String((e&&e.code)||'error')}; }finally{ clearTimeout(tm); } };",
@@ -213,6 +230,11 @@ def main():
     t = rep(t, "send.disabled=true; send.dataset.off='1'; showCanned(); } }\n  }finally{ finishRequest(my);",
             "send.disabled=true; send.dataset.off='1'; showCanned(); }\n      if(e&&KEY_STOP.includes(e.code)) MazeKey.reject(e.code); }\n  }finally{ finishRequest(my);",
             1, "top-level error handler")
+
+    # 9b. the writer's instruction, reworded; and the serving model reported after each writer round
+    t = rep(t, WRITER_OLD, WRITER_NEW, 1, "writer instruction")
+    t = rep(t, "lastSay=say; logLine('think','AI: '+say); if(reply&&reply.why) logLine('think','AI, why: '+reply.why);",
+            "lastSay=say; logLine('think','AI: '+say); if(reply&&reply.why) logLine('think','AI, why: '+reply.why); modelNote(res.servedModel);", 1, "writer round model note")
 
     # 10. the key box's styles, at the end of the page's main stylesheet
     t = rep(t, "@media (prefers-reduced-motion:reduce){.jdg .clip,.verdict{animation:none;opacity:1;transform:none}}\n</style>",
@@ -235,7 +257,7 @@ def main():
     # controller ruling: the bug-report link points at the public repo
     t = rep(t, "const BUG_REPO='https://github.com/marbaji/unwinnable-maze';", "const BUG_REPO='https://github.com/marbaji/maze';", 1, "BUG_REPO")
 
-    for s in ("claude.ai viewer", "Claude cannot answer on this page", "this viewer has", "no viewer, so no judge"):
+    for s in ("You never refuse", "claude.ai viewer", "Claude cannot answer on this page", "this viewer has", "no viewer, so no judge"):
         if s in t:
             fail(f"{s!r} is still in the page")
     # claude.ai may appear only in the two error texts that only the claude.ai-hosted page can raise; anywhere else
