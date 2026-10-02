@@ -210,6 +210,7 @@ figure.panel{padding:18px 18px 14px}
 .wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
 .card.pos .h+.h{margin-top:8px}
 .read h1{max-width:none}
+.sw .swnote{font-size:12px}
 footer{max-width:none}
 </style>
 
@@ -219,7 +220,7 @@ footer{max-width:none}
 
 <article id="read" class="read">
   <h1>How To Make AI Follow Your Instructions, Every Time</h1>
-  <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>.</p>
+  <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>. The text above the game is 515 words, title and headings included.</p>
   <p>We've all been there. You wrote a thoughtful prompt or skill file and were incredibly detailed and organized, but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. You even included the iconic "MAKE NO MISTAKES" in all caps with not one, not two, but <b><i>three </i></b>exclamation marks. Yet alas, mistakes were made. This same problem could arise in sophisticated AI agentic workflows or packaged products as well. If you know what you want, how do you make sure the AI actually does it?</p>
   <p>It turns out it has little to do with how you phrase your ask, and a lot to do with what enforces it. An enforcer is the mechanism outside the model that makes sure the instruction or rule you give it is followed, and through my work I was able to bucket them into exactly 8 categories. AI can help you implement them, as building has become incredibly easy, but you still have to understand the 8 enforcers and when to use each.</p>
   <p>I coded a game as a fun way to learn them. If you want to read the definition of each enforcer and when to use it, <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">I also wrote the article</a>.</p>
@@ -267,7 +268,6 @@ footer{max-width:none}
       <div class="opts" id="opts"><button class="opt"><b>Open the pocket</b><small>remove the four walls around the boxed-in pellet</small></button><button class="opt"><b>Remove every wall</b><small>only the border remains</small></button><button class="opt"><b>A wormhole</b><small>from a dead end at the top left, out onto the boxed-in pellet</small></button><button class="opt"><b>A jetpack</b><small>fly over any inner wall</small></button><button class="opt"><b>A drill</b><small>walking into a wall eats the wall</small></button><button class="opt"><b>A knife</b><small>touching a ghost removes it instead of costing a life</small></button><button class="opt"><b>No ghosts</b><small>nothing chases you</small></button><button class="opt"><b>Gravity</b><small>every move falls as far as it can</small></button><button class="opt"><b>Two squares a step</b><small>every move goes two squares</small></button></div>
     </div>
     <div id="freePane">
-      <p id="askp">An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on the page.</p>
       <textarea id="q" placeholder="remove the walls around the one walled-in pellet to the right"></textarea>
       <div class="row">
         <button class="btn primary" id="send">Ask</button>
@@ -295,7 +295,7 @@ footer{max-width:none}
 </div>
 
 <footer>
-  <p>Written and built by Mo Arbaji. The idea of building a game to show the enforcers in action was inspired by <a href="https://github.com/bendlang/bend" target="_blank" rel="noopener">Bend</a>, a programming language that makes an AI prove its code still keeps the rules you declare. This page's "Code (proof)" enforcer doesn't use Bend; it checks every state the game can reach instead.</p>
+  <p>Written and built by Mo Arbaji. The idea of building a game to show the enforcers in action was inspired by <a href="https://github.com/bendlang/bend" target="_blank" rel="noopener">Bend</a>, a programming language that makes an AI prove its code still keeps the rules you declare, which is the "Code (proof)" enforcer in our game. This page's "Code (proof)" enforcer doesn't use Bend; it checks every state the game can reach instead.</p>
 </footer>
 </div>
 
@@ -1890,9 +1890,9 @@ function noteWait(){ const key=(quizState==='more'||quizState==='longer')?quizSt
 function setTab(t){ askMode=t; document.getElementById('tabQuick').className=t==='quick'?'on':''; document.getElementById('tabFree').className=t==='free'?'on':''; document.getElementById('quickPane').hidden=t!=='quick'; document.getElementById('freePane').hidden=t!=='free'; document.getElementById('reset').hidden=(t==='quick'); }   // the canned pane carries its own Reset above the changes; on the free tab Reset sits on the Ask row after Stop (v40)
 // v40 (Mo, 2026-09-28: "hide canned changes from default, and only if the user doesn't connect their claude then it shows"): the Canned changes tab is hidden
 // until the page learns Claude cannot be used here (a declined permission, or a request refused for access), and a line under the tabs says why
-const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can read it with View Source; the same code is published at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 function cannedShown(){ return !document.getElementById('tabQuick').hidden; }
-function showCanned(){ if(cannedShown()) return; document.getElementById('tabQuick').hidden=false; const n=document.getElementById('cannedwhy'); n.textContent=CANNED_WHY; n.hidden=false; renderPos(); }
+function showCanned(){ if(cannedShown()) return; document.getElementById('tabQuick').hidden=false; const n=document.getElementById('cannedwhy'); n.innerHTML=CANNED_WHY; n.hidden=false; renderPos(); }
 document.getElementById('tabQuick').onclick=()=>setTab('quick'); document.getElementById('tabFree').onclick=()=>{ setTab('free'); permNote(); };
 // v37 (Mo, 2026-09-27): a reader who declined the page's use of Claude is told why Ask is off. state() never prompts; any other state shows nothing new
 const PERM_DENIED='You chose not to let this page use Claude, so typed requests are off for this visit. Reload the page and choose Allow when it asks. Until then, the canned changes still work, except under Prose and Judge, which need Claude too.';
@@ -2099,7 +2099,7 @@ const costSaidKeys=new Set(); function costNote(kind){ const key=kind==='write'?
 let sampleNs=null, ctl=null, pendingApprove=null;
 // ---- the reader's own Anthropic key (the play page): MazeKey owns the key; one function per transition, each ending in sync(), which sets the key box,
 // Send and the capnote from state alone. init() is the one entry point: it runs after capability discovery and returns what sampleNs becomes
-const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can read it with View Source; the same code is published at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.", $=id=>document.getElementById(id);
   let mem=null, hosted=false, blocked=false, err='';   // mem: the key when sessionStorage throws (this visit only); blocked: no credit on the key in use
   const stored=()=>{ try{ const v=sessionStorage.getItem(SK); if(v) return v; }catch(e){} return mem; };
@@ -2113,7 +2113,7 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look
     $('keyerr').textContent=err; $('keyerr').hidden=!err;
     if(asking) send.dataset.off='1'; else delete send.dataset.off;
     send.disabled=busy||!!send.dataset.off;
-    $('capnote').textContent=k?'':ASK_MSG;
+    $('capnote').innerHTML=k?'':ASK_MSG;
     showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so with a reader's key their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
   function init(claudeSample){ if(claudeSample){ hosted=true; sync(); return claudeSample; }
     const k=stored(); sampleNs=k?MazeByok.makeKeySample({key:k}):null; sync(); return sampleNs; }
@@ -2131,7 +2131,7 @@ window.MazeKey=MazeKey;
 (async()=>{ const use=async(name)=>{ try{ return window.claude && typeof window.claude.use==='function' ? await window.claude.use(name) : null; }catch(e){ return null; } };
   sampleNs = MOCK ? mockSample() : MazeKey.init(await use('sample'));
   const note=document.getElementById('capnote');
-  if(!sampleNs){ note.textContent=ASK_MSG; document.getElementById('send').disabled=true; showCanned(); MazeKey.sync(); }
+  if(!sampleNs){ note.innerHTML=ASK_MSG; document.getElementById('send').disabled=true; showCanned(); MazeKey.sync(); }
   else note.textContent='';
 })();
 // ---- limits of the page (v7.28, Mo, 2026-09-24): the writer's LIMIT: line is written to the log as information and nothing more; a run of capped
