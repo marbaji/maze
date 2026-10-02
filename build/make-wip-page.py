@@ -28,7 +28,16 @@ SRC = ROOT / "index.html"
 OUT = ROOT / "wip.html"
 POST_URL = "https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281"
 # opens in a new tab, like the page's other outside links, so a click mid-game does not lose the game
-ARTICLE_LINK = f'<a href="{POST_URL}" target="_blank" rel="noopener">Read more in the article</a>'
+# Each card's "Read more in the article" link lands on its own enforcer's section of the Medium post (Mo, 2026-10-02).
+# Medium gives every heading a four-character id; these were read from the live post on 2026-10-02. An id survives a
+# reworded heading and changes only if the heading is deleted and typed again, in which case the link opens the top of
+# the post. The post sits behind a bot check, so the build cannot verify them; reread them from the post if it is rebuilt.
+ARTICLE_ANCHORS = {"nothing": "d167", "prose": "b22d", "weights": "461c", "human": "d00b", "judge": "9aff",
+                   "test": "a79e", "proof": "b690", "construction": "d93d", "capability": "8aa1"}
+
+
+def article_link(anchor):
+    return f'<a href="{POST_URL}#{anchor}" target="_blank" rel="noopener">Read more in the article</a>'
 
 START = "nothing"   # the position the page opens on; must be an id in MODES and not a disabled one
 
@@ -263,6 +272,8 @@ def main():
         if not rid:
             sys.exit(f"make-wip-page: unreadable MODES row: {line[:60]}")
         rows[rid.group(1)] = line
+    if set(ARTICLE_ANCHORS) != {k for k, _, _ in MODES} or len(set(ARTICLE_ANCHORS.values())) != len(MODES):
+        sys.exit("make-wip-page: ARTICLE_ANCHORS must hold one distinct anchor for each MODES id")
     if set(rows) != {k for k, _, _ in MODES}:
         sys.exit(f"make-wip-page: MODES ids differ: {sorted(rows)}")
     new_rows = []
@@ -270,7 +281,7 @@ def main():
         row = rows[mid]
         if not row.endswith("},"):
             sys.exit(f"make-wip-page: MODES row shape: {mid}")
-        new_rows.append(row[:-2] + f",def:{js_str(d)},use:{js_str(u)}" + "},")
+        new_rows.append(row[:-2] + f",def:{js_str(d)},use:{js_str(u)},art:{js_str(ARTICLE_ANCHORS[mid])}" + "},")
     t = t[:m.start(1)] + "\n".join(new_rows) + t[m.end(1):]
 
     # the opening position
@@ -293,7 +304,7 @@ def main():
     # the card: what it is, what it does in this game, when to use it, and the article
     card_old = "<div class=\"h\">${posH(m)}</div>`; }"
     card_new = ("<div class=\"h\"><b>What it is.</b> ${m.def}</div><div class=\"h\"><b>In this game.</b> ${posH(m)}</div>"
-                "<div class=\"h\"><b>When to use it.</b> ${m.use} " + ARTICLE_LINK + ".</div>`; }")
+                "<div class=\"h\"><b>When to use it.</b> ${m.use} " + article_link("${m.art}") + ".</div>`; }")
     t = once(t, card_old, card_new, "card template")
 
     # the static first paint (before the page's script runs): the switch in MODES order with START selected, START's
@@ -324,7 +335,7 @@ def main():
     static = (f'<div class="card pos" id="pos"><div class="top"><span class="badge">{names[START]}</span></div>'
               f'<div class="r">You can never win, enforced by {field(rows[START], "sub", START)}</div>'
               f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {h}</div>'
-              f'<div class="h"><b>When to use it.</b> {u} {ARTICLE_LINK}.</div></div>\n')
+              f'<div class="h"><b>When to use it.</b> {u} {article_link(ARTICLE_ANCHORS[START])}.</div></div>\n')
     t = t[:pos.start()] + static + t[pos.end():]
     t = once(t, '<div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div>',
              f'<div class="card slot" id="card"><div class="top"><span class="badge">{names[START]}</span></div>', "static result slot")
