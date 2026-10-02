@@ -13,10 +13,11 @@ non-zero and writes nothing (the previous wip.html, if any, is left as it was, s
 The opening position is START, and the switch order is the order of MODES below. The script's own table, the starting
 mode, and the static first paint (the switch, the enforcer's card and the result slot shown before the page's script
 runs) are all derived from those two. The copy above the switch is hand-written (Mo's words): the build fails unless
-it calls the opening position the first switch and that position is first in MODES, and unless MODES holds the eight
-enforcers the copy counts. The copy also says each enforcer is stronger than the one before it, which no build check
+it calls the opening position the first switch and that position is first in MODES, and unless every number the copy
+gives for the enforcers ("8 enforcers", "8 categories") equals the rows of MODES after the first. The copy also says each enforcer is stronger than the one before it, which no build check
 can test, so a change of order still means rereading that copy by hand.
 """
+import html
 import re
 import sys
 from pathlib import Path
@@ -57,12 +58,17 @@ MODES = [
 # every time", and the sentence about agentic workflows and packaged products). "key field" replaces his first
 # "encrypted field": the field is masked, not encrypted (the key sits in the tab's session storage and goes only to
 # Anthropic).
+# main() counts the words a reader meets before the game and writes the number where this token sits (Mo, 2026-10-01:
+# "what's the word count on the pre-game intro? print that on the page")
+WORDS_TOKEN = "@@WORDS@@"
+
 TITLE_OLD = "  <h1>The Unwinnable Maze</h1>\n"
 TITLE_NEW = "  <h1>How To Make AI Follow Your Instructions, Every Time</h1>\n"
 
 INTRO_OLD_RE = re.compile(r'  <p><b>Welcome to the Unwinnable Maze\.</b>.*?Now comes the fun part!</p>\n')
 INTRO_NEW = (
-    '  <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>.</p>\n'
+    '  <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>. The text above the game is '
+    f'{WORDS_TOKEN} words, title and headings included.</p>\n'
     "  <p>We've all been there. You wrote a thoughtful prompt or skill file and were incredibly detailed and organized, "
     "but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. You even "
     'included the iconic "MAKE NO MISTAKES" in all caps with not one, not two, but <b><i>three </i></b>exclamation '
@@ -118,6 +124,9 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
        ".read h1{max-width:none}\n"
+       # the switch note at 12px, the largest size at which its two sentences fit on two lines in the desktop column
+       # (measured: 14, 13 and 12.5px give three; Mo, 2026-10-01: "a little smaller so it fits on 2 lines instead of 3")
+       ".sw .swnote{font-size:12px}\n"
        # the footer runs under both columns (Mo, 2026-10-01); the live page stops it at 80ch
        "footer{max-width:none}\n")
 
@@ -188,15 +197,18 @@ def main():
     if START not in rows or "disabled:true" in rows[START]:
         sys.exit(f"make-wip-page: START {START!r} is not a choosable MODES id")
     t = once(t, "let mode='proof'; let programBy=null;", f"let mode='{START}'; let programBy=null;", "default mode")
-    # the copy above the switch is hand-written and states two things the tables above decide: the opening position by
-    # name, and that it is the first position on the switch; fail rather than ship it stale
+    # the copy above the switch is hand-written and states three things the tables above decide: the opening position
+    # by name, that it is the first position on the switch, and how many enforcers follow it; fail rather than ship it stale
     start_name = field(rows[START], "name", START)
     if f'The first switch, "{start_name},"' not in START_NEW:
         sys.exit(f'make-wip-page: the copy above the switch does not call "{start_name}" (START) the first switch')
     if MODES[0][0] != START:
         sys.exit(f'make-wip-page: the copy above the switch calls "{start_name}" the first switch, but MODES starts with {MODES[0][0]}')
-    if len(MODES) - 1 != 8 or START_NEW.count("8 enforcers") != 1:
-        sys.exit("make-wip-page: the copy above the switch says there are 8 enforcers after the first position; MODES disagrees or the copy changed")
+    counts = re.findall(r"\b(\d+) (?:enforcers|categories)\b", INTRO_NEW + START_NEW)
+    if not counts:
+        sys.exit("make-wip-page: the copy above the switch no longer says how many enforcers there are; drop this check if that is meant")
+    if any(int(c) != len(MODES) - 1 for c in counts):
+        sys.exit(f"make-wip-page: the copy above the switch counts {sorted(set(counts))} enforcers; MODES holds {len(MODES) - 1} after the first position")
 
     # the card: what it is, what it does in this game, when to use it, and the article
     card_old = "<div class=\"h\">${posH(m)}</div>`; }"
@@ -248,8 +260,18 @@ def main():
         sys.exit("make-wip-page: page stylesheet has no end")
     t = t[:style_end] + CSS + t[style_end:]
 
+    # the words a reader meets before the game: the article's text, without the preview note that reports the number
+    art = one(r'<article id="read" class="read">\n(.*?)</article>', t, "article", re.S).group(1)
+    art = re.sub(r'  <p class="wipnote">.*?</p>\n', "", art, count=1)
+    if WORDS_TOKEN in art:
+        sys.exit("make-wip-page: the preview note was not removed before counting")
+    # a line break or the end of a block separates words; an inline tag does not ("</a>." is one word with its link text)
+    art = re.sub(r"<br>|</(?:p|h1|h2)>", " ", art)
+    words = len(html.unescape(re.sub(r"<[^>]+>", "", art)).split())
+    t = once(t, WORDS_TOKEN, str(words), "word count")
+
     OUT.write_text(t, encoding="utf-8")
-    print(f"OK wip.html ({len(t.encode('utf-8'))} bytes)")
+    print(f"OK wip.html ({len(t.encode('utf-8'))} bytes, {words} words above the game)")
 
 
 if __name__ == "__main__":
