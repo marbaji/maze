@@ -41,10 +41,13 @@ def article_link(anchor):
 
 START = "nothing"   # the position the page opens on; must be an id in MODES and not a disabled one
 
-# weakest to strongest; def and use are shortened from the article's own sentences
+# weakest to strongest; def and use are shortened from the article's own sentences, except Nothing's, which are Mo's
+# own from the review page (2026-10-02)
 MODES = [
-    ("nothing", "Nothing means nobody is checking anything. It is the baseline every other enforcer is measured against.",
-     "When a broken rule costs you little, like a style preference. Write it down anyway, so others know it is unenforced."),
+    ("nothing", '"Nothing" means nobody is checking any rules and anything you ask for goes. It is the baseline every other '
+                'enforcer is measured against.',
+     "When a broken rule costs you little, like a style preference. Or when you're keeping a backlog of rules you want "
+     "to build enforcers for in a doc somewhere, but haven't gotten around to wiring them yet."),
     ("prose", "Prose is a sentence in the prompt, and nothing checks the result.",
      "For preferences, not rules. Anything you can live with being ignored one time in twenty."),
     ("weights", "Weights means the model was trained to follow the rule, so the rule comes out of the model itself.",
@@ -120,8 +123,8 @@ START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maz
              'way for every player every time.</p>\n')
 
 SWNOTE_OLD = "The mechanisms that enforce it are ordered strongest to weakest. Switch between them and see if you can break the rule."
-SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is on the switch but cannot be chosen, because "
-              "nobody has trained an LLM specifically to make this game unwinnable.")
+SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is the one enforcer switch that cannot be chosen, "
+              "because nobody has trained an LLM specifically to make this game unwinnable.")
 # Mo folded the Weights sentence into the switch note, so the separate note under the switch goes. The page's flip()
 # scrolled to that note for a disabled position; it now scrolls to the switch note (no link on the page calls flip()
 # today, only the test hook, but it would throw on a missing element)
@@ -144,7 +147,7 @@ ASK_MSG_OLD = ('"To use Ask anything, paste an Anthropic API key below. It stays
 ASK_MSG_NEW = ('"To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
                'Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything '
                'else, including the checking of the program, the search and the game itself, is code that runs on this '
-               "page, so you can inspect this page's source and read it, or read the same code at "
+               "page, so you can inspect this page's source to read it, or read the same exact code at "
                "<a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. "
                'Until then, you can use the \\"Canned changes\\" mode, which are saved ready-made changes that run '
                'without an API key.";')
@@ -186,6 +189,43 @@ GUIDE_STEP_OLD = ("If it asks you to buy usage credits, the smallest amount of $
 GUIDE_STEP_NEW = ("If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type "
                   "$2-3. Whatever you don't use stays in your account. You're just putting "
                   "a little money on it so you can play without interruption. Leave Auto-reload off.")
+
+# Copy edits to text that index.html itself holds, applied to its text before anything else. Each is (old, new, how many
+# times old must occur, what it is). They are Mo's, from the screen-by-screen review pages (2026-10-02): his in-place
+# edits on the Nothing page, and his comment that "position" is a made-up word for what the page elsewhere calls an
+# enforcer. "position" stays where it means a game position (the search's counts) or a place in a list.
+COPY_EDITS = [
+    ("h:'Nobody checks. The game still starts walled off, like every position. Ask for the wall to go and it goes. This is the baseline every other position is measured against.'",
+     'h:\'The game still starts walled off, as it does under every enforcer. Ask for the wall to go and it goes, because no mechanism is checking the "You can never win" rule. This is the baseline every other enforcer is measured against.\'',
+     1, 'Nothing card, in this game (his edit; "like every position" reworded for his position-to-enforcer comment)'),
+    ('You can never win, enforced by ',
+     'The rule "You can never win" is enforced by ',
+     2, "the line under each card's badge"),
+    ('checks what you ask. Its verdict appears here.',
+     'This box populates after you ask for a change and the AI builds the game you asked for. It shows whether the "You can never win" rule persisted or if you managed to break it, and why.',
+     2, 'the empty result box'),
+    ('Activity log. It keeps everything from this visit, including play, until you clear it:',
+     'Activity log. Every step the game takes is written here as it happens.',
+     1, 'the label above the activity log'),
+    ('No enforcer reads the program, so any change goes straight through.',
+     'No enforcer reads the program after the AI writes it to check for anything, so any change goes straight through.',
+     1, 'result card under Nothing'),
+    ('Go win, or reset the game and try another enforcer.',
+     'Go win, or reset the game and try a stronger enforcer.',
+     2, 'the closing sentence of a broken-rule card'),
+    ('Could this position have stopped it?',
+     'Could this enforcer have stopped it?',
+     1, "the card's question after a change got through"),
+    ('No. Nothing checks the program; every change gets through.',
+     'No. Nothing checks the program you asked for after the AI writes it, so every change gets through.',
+     1, 'the answer under Nothing'),
+    ('No. In this position, there is no ',
+     'No. With this enforcer, there is no ',
+     1, 'the answer under Capability (position to enforcer)'),
+    ('It is the only position with no rule',
+     'It is the only switch with no rule',
+     1, 'under Nothing when the search could not say (position to enforcer; Nothing is not an enforcer, so his word for it, switch)'),
+]
 
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
        ".card.pos .h+.h{margin-top:8px}\n"
@@ -236,6 +276,10 @@ def field(row, name, mid):
 
 def main():
     t = SRC.read_text(encoding="utf-8")
+    for old, new, n, what in COPY_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"make-wip-page: copy edit ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
 
     # the title, the intro, and the copy between the play heading and the switch
     if len(INTRO_OLD_RE.findall(t)) != 1:
@@ -333,7 +377,7 @@ def main():
     # the page's posH() drops these two clauses while the canned changes are hidden; the static card matches index.html's
     h = field(rows[START], "h", START).replace("the canned changes are disabled and ", "").replace("a canned change runs its repaired version, ", "")
     static = (f'<div class="card pos" id="pos"><div class="top"><span class="badge">{names[START]}</span></div>'
-              f'<div class="r">You can never win, enforced by {field(rows[START], "sub", START)}</div>'
+              f'<div class="r">The rule "You can never win" is enforced by {field(rows[START], "sub", START)}</div>'
               f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {h}</div>'
               f'<div class="h"><b>When to use it.</b> {u} {article_link(ARTICLE_ANCHORS[START])}.</div></div>\n')
     t = t[:pos.start()] + static + t[pos.end():]
