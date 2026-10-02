@@ -209,6 +209,8 @@ figure.panel{padding:18px 18px 14px}
 .keybox details p{margin:0}
 .wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
 .card.pos .h+.h{margin-top:8px}
+.read h1{max-width:none}
+footer{max-width:none}
 </style>
 
 <div class="wrap" data-blocks="">
@@ -216,24 +218,24 @@ figure.panel{padding:18px 18px 14px}
 <noscript><div class="nojs">The game below needs JavaScript. The article above does not.</div></noscript>
 
 <article id="read" class="read">
-  <h1>The Unwinnable Maze</h1>
+  <h1>How To Make AI Follow Your Instructions, Every Time</h1>
   <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>.</p>
-  <p>Have you ever written a skill file, been very detailed, told the AI "MAKE NO MISTAKES" in all caps with extra punctuation, and it still made a bunch of mistakes? If you know what you want, how do you make sure the system you're building actually does it?</p>
-  <p>It turns out it has little to do with how you phrase it, and a lot to do with what enforces it. An enforcer is the mechanism outside the model that holds a rule for it, and there are eight of them. The good news is that AI can help you with the implementation, and building has become incredibly easy, but you still have to understand the enforcers and when to use which.</p>
-  <p>This game is an easy way to learn them. If you want to read the definition of each one and when to use it, <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">here is the article</a>. The game is below.</p>
+  <p>We've all been there. We wrote a thoughtful prompt or skill file and were incredibly detailed and organized, but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. Perhaps we even built a multi-month agentic AI workflow or packaged product with a high degree of sophistication, and you even included the iconic "MAKE NO MISTAKES" in all caps with not one, not two, but <b><i>three </i></b>exclamation marks. Yet alas, mistakes were made. If you know what you want, how do you make sure the AI actually does it?</p>
+  <p>It turns out it has little to do with how you phrase your ask from the AI, and a lot to do with what enforces it. An enforcer is the mechanism outside the model that makes sure the instruction or rule you give it is followed, and through my work I was able to bucket them into exactly 8 categories. What's so great about today's world is that AI can help you with implementing the enforcer mechanisms, as building has become incredibly easy, but you still have to understand the 8 enforcers and when to use each.</p>
+  <p>I coded an game as a fun way to learn them. If you want to read the definition of each enforcer and when to use it, <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">I also wrote the article</a>.</p>
 
-  <h2 id="read-play">Now try to break the game&nbsp;</h2>
-  <p>The switch starts on "Nothing": nobody is checking, so any change you ask for goes straight into the game. Pick the canned change "Open the pocket" and the rule is broken. Then move along the switch one enforcer at a time and try the same change again. Each one is stronger than the one before it.</p>
-  <p>The canned changes work without an API key. To ask for a change in your own words, paste an Anthropic API key under "Ask anything".</p>
-  <p class="rule">The rule: you can never win, whatever winning means in the current game. The game starts with winning defined as eating every pellet.</p>
+  <h2 id="read-play">The Unwinnable Maze</h2>
+  <p>You're a round chomper trying to eat all the pellets in a maze while running away from the spooky monsters. The problem is that the maze starts with one pellet boxed in with walls on all four sides, preventing you from reaching it. The game has a chat box where you can ask for anything you want and watch it materialize, literally you can ask for anything (or become anything). The game only has one rule and one rule only</p>
+  <p class="rule"><i>The rule: you can never win, whatever winning means in the current game. The game starts with winning defined as eating every pellet.</i></p>
+  <p>But like we mentioned above, that rule, like any other rule, can be enforced by one of 8 enforcers. The game encodes each enforcer as a switch and lets you switch between them. The first switch, "Nothing," is the only one that isn't an enforcer; it just means that any change you ask for goes straight into the game as you ask it, because nothing reads our "you can never win" rule. So it's just our baseline for all the other switches. The 8 enforcers are: prose, weights, human, judge, code (tests), code (proof), construction, and capability. Each one is stronger than the one before it, so I would recommend progressing through them in order.<br><br>The entire program is code that runs live on this page, except for the AI that takes in your ask and rebuilds that program. That would be a light Opus call to your account, so if you'd like to try this game out you can put a dollar or a couple on an expiring API key and paste it in the field below (if you don't know how to do that, there's a guide that helps you) and you can keep playing for as long as you'd like.</p>
+  <p>There are a few canned changes, like "remove the walls" or "give me a jetpack" that I've run from my account and saved their code so I can have a route that work without an API key for those who want to play. Because they are canned, they behave the same way every time. To ask for a change in your own words, paste an Anthropic API key under "Ask anything."</p>
   
 </article>
 
 <div class="sw" id="switch" data-noedit="">
   <div class="swl">
-  <div class="swnote">The enforcers are ordered weakest to strongest. Start at the left and work your way up.</div>
+  <div class="swnote">The enforcers are ordered weakest to strongest. Weights is on the switch but cannot be chosen; because nobody has trained an LLM specifically to make this game unwinnable.</div>
   <div class="seg" id="seg"><button class="on"><span>Nothing</span><small>nobody</small></button><button><span>Prose</span><small>a sentence</small></button><button class="off" disabled="" title="not choosable: nobody trained a model about this game"><span>Weights</span><small>not choosable</small></button><button><span>Human</span><small>you approve it</small></button><button><span>Judge</span><small>a model reads it</small></button><button><span>Code (tests)</span><small>20 playthroughs</small></button><button><span>Code (proof)</span><small>every state</small></button><button><span>Construction</span><small>the type itself</small></button><button><span>Capability</span><small>no tool</small></button></div>
-  <div class="wnote">Weights is on the switch but cannot be chosen: nobody trained a model never to make this game winnable.</div>
   </div>
   <div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div><div class="r">You can never win, enforced by nobody</div><div class="h"><b>What it is.</b> Nothing means nobody is checking anything. It is the baseline every other enforcer is measured against.</div><div class="h"><b>In this game.</b> Nobody checks. The game still starts walled off, like every position. Ask for the wall to go and it goes. This is the baseline every other position is measured against.</div><div class="h"><b>When to use it.</b> When a broken rule costs you little, like a style preference. Write it down anyway, so others know it is unenforced. <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281" target="_blank" rel="noopener">Read more in the article</a>.</div></div>
 </div>
@@ -2463,7 +2465,7 @@ function flip(id){
   if (!m) return false;
   const target = document.getElementById('seg');
   if (m.disabled) {
-    target.parentElement.querySelector('.wnote').scrollIntoView({behavior:'smooth', block:'center'});
+    target.parentElement.querySelector('.swnote').scrollIntoView({behavior:'smooth', block:'center'});
     return false;
   }
   const sw = target.closest('.sw') || target;
