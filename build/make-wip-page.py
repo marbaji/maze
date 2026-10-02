@@ -123,6 +123,30 @@ START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maz
              'from my account and saved, so you can play without a key. Because they are canned, they behave the same '
              'way for every player every time.</p>\n')
 
+# The copy above the game, slimmed (Mo, 2026-10-02: "an attempt at slimming down the copy above the unwinnable maze game
+# without losing my voice or important points"; he approved these on the comparison page, round two). INTRO_NEW and
+# START_NEW above stay as he wrote them; each cut here is (his words, the shorter form) and must match once in the page.
+TOP_COPY_CUTS = [
+    ("You wrote a thoughtful prompt or skill file and were incredibly detailed and organized, but the AI skipped",
+     "You wrote a thoughtful prompt or skill file, incredibly detailed and organized, but the AI skipped"),
+    ("This same problem could arise in sophisticated AI agentic workflows or packaged products as well.",
+     "This same problem could arise in agentic workflows or packaged products as well."),
+    ("AI can help you implement them, as building has become incredibly easy, but you still have to understand",
+     "Building them has become incredibly easy with AI, but you still have to understand"),
+    ("If you want to read the definition of each enforcer and when to use it, <a ",
+     "For the definition of each enforcer and when to use it, <a "),
+    ("The problem is that the maze starts with one pellet boxed in with walls on all four sides, preventing you from reaching it.",
+     "The problem is that one pellet starts boxed in with walls on all four sides, so you can't reach it."),
+    ("can be enforced by one of the 8 enforcers. The game encodes each enforcer as a switch and lets you switch between them. The first switch",
+     "can be enforced by one of the 8 enforcers, and the game gives you a switch for each. The first switch"),
+    ("It's our baseline for all the other switches. Each one is stronger than the one before it, so I would recommend progressing through them in order.",
+     "It's our baseline. Each switch after it is stronger than the one before, so I would recommend progressing through them in order."),
+    ("except for the AI that takes in your ask and rebuilds that program. That is a light Opus call to your account, so to ask for changes in your own words you can put a dollar or a few",
+     "except for the AI that takes in your ask and rebuilds it. That is a light Opus call to your account, so to ask for changes in your own words, put a dollar or a few"),
+    ("so you can play without a key. Because they are canned, they behave the same way for every player every time.",
+     "so you can play without a key. They behave the same way for every player every time."),
+]
+
 SWNOTE_OLD = "The mechanisms that enforce it are ordered strongest to weakest. Switch between them and see if you can break the rule."
 SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is the one that cannot be chosen, "
               "because nobody has trained an LLM specifically to make this game unwinnable.")
@@ -345,6 +369,8 @@ def main():
     t = once(t, TITLE_OLD, TITLE_NEW, "title")
     t = once(t, HEAD_OLD, HEAD_NEW, "play heading")
     t = once(t, START_OLD, START_NEW, "start paragraphs and the rule")
+    for old, new in TOP_COPY_CUTS:
+        t = once(t, old, new, f"top copy cut ({old[:40]}...)")
     t = once(t, SWNOTE_OLD, SWNOTE_NEW, "switch note")
     t = once(t, WNOTE_OLD, "", "weights note")
     t = once(t, WNOTE_JS_OLD, WNOTE_JS_NEW, "weights click target")
