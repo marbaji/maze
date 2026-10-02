@@ -168,14 +168,14 @@ WORM_FIX_NEW = r"k: 'pellet' }; }\n" + PLAYER_LINE + '"),'
 # The preview's own copy of the picture guide (guide/wip.html, built from guide/index.html, which is the live guide and
 # is not changed). Mo, 2026-10-02, on the step about buying credits: "Remember even if you put money on your API key
 # what you don't use will stay in your account. We're just putting a little bit of money on it so you can play wihtout
-# interruption ... or some version of that". "for up to a year" is added because Anthropic's credits expire a year
-# after purchase (support.claude.com, "How do I pay for my Claude API usage?", read 2026-10-02).
+# interruption ... or some version of that". He then cut "Remember," and "for up to a year" from my version of it
+# (Anthropic's credits do expire a year after purchase; leaving that out is his call).
 GUIDE_SRC = ROOT / "guide" / "index.html"
 GUIDE_OUT = ROOT / "guide" / "wip.html"
 GUIDE_STEP_OLD = ("If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type "
                   "$2-3. Leave Auto-reload off.")
 GUIDE_STEP_NEW = ("If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type "
-                  "$2-3. Remember, whatever you don't use stays in your account for up to a year. You're just putting "
+                  "$2-3. Whatever you don't use stays in your account. You're just putting "
                   "a little money on it so you can play without interruption. Leave Auto-reload off.")
 
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
