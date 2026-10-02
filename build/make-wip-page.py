@@ -237,8 +237,8 @@ COPY_EDITS = [
      "q+=(hz.explain?`<div class=\"qa hx\">${esc(hz.explain)}</div>`:'')+",
      1, 'the explanation row under an answer is drawn only when there is one (Nothing no longer has one)'),
     ('taking the ghosts away does not touch a wall.',
-     'taking the ghosts away does not remove the walls from around the enclosed pellet.',
-     1, 'why "No ghosts" leaves the game unwinnable'),
+     'taking the spooky monsters away does not remove the walls from around the enclosed pellet.',
+     1, 'why "No ghosts" leaves the game unwinnable (his edit; "ghosts" became "spooky monsters" at his later word, below)'),
     ('so no move ever lands on it; a fall stops at a wall like any move.',
      'so no move ever lands on it. Gravity actually makes things worse because you are unable to move up in this game and you drop down like dead weight.',
      1, 'why "Gravity" leaves the game unwinnable'),
@@ -274,7 +274,34 @@ COPY_EDITS = [
     (r"reading the program and the writer\'s note",
      r"reading the program and the AI\'s note",
      1, 'Judge card after the judge let a change through (writer to AI)'),
+    # --- his rulings in chat after that round (2026-10-02): "yes to 'spooky monsters' throughout" (the game's fixed text;
+    # the program's own code and what the AI is told still say ghosts, since the page draws the kind 'ghost'); the line
+    # under the badge for Human and Judge (BY, below); and a fixed line on the card after a bare demand to win, in place
+    # of the AI's own sentence, which opened with the brief's "no version keeps the rule:" every time.
+    ('touching a ghost removes it instead of costing a life',
+     'touching a spooky monster removes it instead of costing a life',
+     2, 'the knife card, in the table and in the static first paint (ghost to spooky monster)'),
+    ('No ghosts',
+     'No spooky monsters',
+     2, 'the canned change\'s name, in the table and in the static first paint (ghost to spooky monster)'),
+    ('the ghost pen in the middle',
+     'the spooky monster pen in the middle',
+     1, 'why the repaired "Open the pocket" stays unwinnable (ghost to spooky monster)'),
+    ('the ghost pen at "9,7"',
+     'the spooky monster pen at "9,7"',
+     1, 'what the repaired "Open the pocket" kept and changed (ghost to spooky monster)'),
+    ("now.say=say; now.why='The game is unchanged.'; now.noWin=true;",
+     "now.say='The AI turns down a bare demand to win under every switch. Request denied.'; now.from=''; now.why='The game is unchanged.'; now.noWin=true;",
+     1, 'the card after a bare demand to win: a fixed line where the AI\'s own sentence was, and no "What the AI wrote" header over it'),
+    ('enforced by ${m.sub}</div>',
+     'enforced by ${m.by||m.sub}</div>',
+     1, "the line under each card's badge reads its own ending where the switch's short label does not fit the sentence"),
 ]
+
+# The line under a card's badge is 'The rule "You can never win" is enforced by ' and then the switch's short label. Two
+# labels are not things a rule can be enforced by ("you approve it", "a model reads it"), so the card says these instead;
+# the switch keeps its labels (Mo, 2026-10-02).
+BY = {"human": "your approval", "judge": "a second model that reads the program"}
 
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
        ".card.pos .h+.h{margin-top:8px}\n"
@@ -374,7 +401,8 @@ def main():
         row = rows[mid]
         if not row.endswith("},"):
             sys.exit(f"make-wip-page: MODES row shape: {mid}")
-        new_rows.append(row[:-2] + f",def:{js_str(d)},use:{js_str(u)},art:{js_str(ARTICLE_ANCHORS[mid])}" + "},")
+        by = f",by:{js_str(BY[mid])}" if mid in BY else ""
+        new_rows.append(row[:-2] + f",def:{js_str(d)},use:{js_str(u)},art:{js_str(ARTICLE_ANCHORS[mid])}{by}" + "},")
     t = t[:m.start(1)] + "\n".join(new_rows) + t[m.end(1):]
 
     # the opening position
@@ -426,7 +454,7 @@ def main():
     # the page's posH() drops these two clauses while the canned changes are hidden; the static card matches index.html's
     h = field(rows[START], "h", START).replace("the canned changes are disabled and ", "").replace("a canned change runs its repaired version, ", "")
     static = (f'<div class="card pos" id="pos"><div class="top"><span class="badge">{names[START]}</span></div>'
-              f'<div class="r">The rule "You can never win" is enforced by {field(rows[START], "sub", START)}</div>'
+              f'<div class="r">The rule "You can never win" is enforced by {BY.get(START) or field(rows[START], "sub", START)}</div>'
               f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {h}</div>'
               f'<div class="h"><b>When to use it.</b> {u} {article_link(ARTICLE_ANCHORS[START])}.</div></div>\n')
     t = t[:pos.start()] + static + t[pos.end():]
