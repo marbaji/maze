@@ -7,8 +7,12 @@ The preview is the game-first version Mo asked for on 2026-10-01: the page stand
 linked as the reference), the switch runs weakest to strongest and starts on Nothing, and each enforcer's card says what
 it is and when to use it. Nothing here is final. index.html, the live page, is not changed by this script.
 
-Every edit is anchored on an exact string of index.html and must match exactly once, or the script exits non-zero and
-writes nothing.
+Every edit is anchored on an exact string or pattern of index.html and must match exactly once, or the script exits
+non-zero and writes nothing (the previous wip.html, if any, is left as it was, so gate a commit on the exit code).
+
+The opening position is START, and the switch order is the order of MODES below. The script's own table, the starting
+mode, and the static first paint (the switch, the enforcer's card and the result slot shown before the page's script
+runs) are all derived from those two, so changing either one changes every place together.
 """
 import re
 import sys
@@ -18,6 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "index.html"
 OUT = ROOT / "wip.html"
 POST_URL = "https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281"
+# opens in a new tab, like the page's other outside links, so a click mid-game does not lose the game
+ARTICLE_LINK = f'<a href="{POST_URL}" target="_blank" rel="noopener">Read more in the article</a>'
+
+START = "nothing"   # the position the page opens on; must be an id in MODES and not a disabled one
 
 # weakest to strongest; def and use are shortened from the article's own sentences
 MODES = [
@@ -82,6 +90,25 @@ def js_str(s):
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
+def js_unstr(s):
+    """The text of a single-quoted JavaScript string body as the page would show it."""
+    return re.sub(r"\\(.)", r"\1", s)
+
+
+def one(pattern, text, what, flags=0):
+    found = list(re.finditer(pattern, text, flags))
+    if len(found) != 1:
+        sys.exit(f"make-wip-page: {what}: expected 1 match, found {len(found)}")
+    return found[0]
+
+
+def field(row, name, mid):
+    m = re.search(name + r":'((?:[^'\\]|\\.)*)'", row)
+    if not m:
+        sys.exit(f"make-wip-page: MODES row {mid} has no {name}")
+    return js_unstr(m.group(1))
+
+
 def main():
     t = SRC.read_text(encoding="utf-8")
 
@@ -93,9 +120,7 @@ def main():
     t = once(t, SWNOTE_OLD, SWNOTE_NEW, "switch note")
 
     # the MODES table: reorder weakest first, add def and use to each row
-    m = re.search(r"const MODES=\[\n(.*?)\n\];", t, re.S)
-    if not m:
-        sys.exit("make-wip-page: MODES table not found")
+    m = one(r"const MODES=\[\n(.*?)\n\];", t, "MODES table", re.S)
     rows = {}
     for line in m.group(1).split("\n"):
         rid = re.match(r" \{id:'([a-z]+)',", line)
@@ -112,44 +137,63 @@ def main():
         new_rows.append(row[:-2] + f",def:{js_str(d)},use:{js_str(u)}" + "},")
     t = t[:m.start(1)] + "\n".join(new_rows) + t[m.end(1):]
 
-    # start on Nothing
-    t = once(t, "let mode='proof'; let programBy=null;", "let mode='nothing'; let programBy=null;", "default mode")
+    # the opening position
+    if START not in rows or "disabled:true" in rows[START]:
+        sys.exit(f"make-wip-page: START {START!r} is not a choosable MODES id")
+    t = once(t, "let mode='proof'; let programBy=null;", f"let mode='{START}'; let programBy=null;", "default mode")
 
     # the card: what it is, what it does in this game, when to use it, and the article
     card_old = "<div class=\"h\">${posH(m)}</div>`; }"
     card_new = ("<div class=\"h\"><b>What it is.</b> ${m.def}</div><div class=\"h\"><b>In this game.</b> ${posH(m)}</div>"
-                "<div class=\"h\"><b>When to use it.</b> ${m.use} <a href=\"" + POST_URL + "\">Read more in the article</a>.</div>`; }")
+                "<div class=\"h\"><b>When to use it.</b> ${m.use} " + ARTICLE_LINK + ".</div>`; }")
     t = once(t, card_old, card_new, "card template")
 
-    # the static first paint (before the script runs): the switch and the card, for Nothing
-    seg = re.search(r'<div class="seg" id="seg">(.*?)</div>\n', t)
-    if not seg:
-        sys.exit("make-wip-page: static switch not found")
-    buttons = re.findall(r"<button.*?</button>", seg.group(1))
-    if len(buttons) != 9:
-        sys.exit(f"make-wip-page: static switch has {len(buttons)} buttons")
-    buttons = [b.replace('<button class="on">', "<button>") for b in reversed(buttons)]
-    buttons[0] = buttons[0].replace("<button>", '<button class="on">', 1)
+    # the static first paint (before the page's script runs): the switch in MODES order with START selected, START's
+    # card, and the result slot's badge
+    seg = one(r'<div class="seg" id="seg">(.*?)</div>\n', t, "static switch")
+    by_name = {}
+    for b in re.findall(r"<button.*?</button>", seg.group(1)):
+        name = re.search(r"<span>(.*?)</span>", b)
+        if not name:
+            sys.exit(f"make-wip-page: static switch button has no name: {b[:60]}")
+        by_name[name.group(1)] = b.replace('<button class="on">', "<button>")
+    names = {mid: field(rows[mid], "name", mid) for mid, _, _ in MODES}
+    if set(by_name) != set(names.values()):
+        sys.exit(f"make-wip-page: static switch names differ from MODES: {sorted(by_name)}")
+    buttons = [by_name[names[mid]] for mid, _, _ in MODES]
+    at = [mid for mid, _, _ in MODES].index(START)
+    if not buttons[at].startswith("<button>"):
+        sys.exit(f"make-wip-page: the static button for {START} cannot be selected: {buttons[at][:60]}")
+    buttons[at] = '<button class="on">' + buttons[at][len("<button>"):]
+    if "".join(buttons).count('class="on"') != 1:
+        sys.exit("make-wip-page: static switch does not have exactly one selected button")
     t = t[:seg.start(1)] + "".join(buttons) + t[seg.end(1):]
-    pos = re.search(r'<div class="card pos" id="pos">.*?</div></div>\n', t)
-    if not pos:
-        sys.exit("make-wip-page: static card not found")
-    d, u = MODES[0][1], MODES[0][2]
-    nothing_h = re.search(r"h:'(.*?)'\}", rows["nothing"]).group(1)
-    static = ('<div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div>'
-              '<div class="r">You can never win, enforced by nobody</div>'
-              f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {nothing_h}</div>'
-              f'<div class="h"><b>When to use it.</b> {u} <a href="{POST_URL}">Read more in the article</a>.</div></div>\n')
-    t = t[:pos.start()] + static + t[pos.end():]
 
-    t = once(t, "<title>Unwinnable Maze</title>", '<title>Unwinnable Maze (preview)</title>\n<meta name="robots" content="noindex">', "title")
-    style_end = t.find("</style>")
+    pos = one(r'<div class="card pos" id="pos">.*?</div></div>\n', t, "static card")
+    d, u = next((d, u) for mid, d, u in MODES if mid == START)
+    # the page's posH() drops these two clauses while the canned changes are hidden; the static card matches index.html's
+    h = field(rows[START], "h", START).replace("the canned changes are disabled and ", "").replace("a canned change runs its repaired version, ", "")
+    static = (f'<div class="card pos" id="pos"><div class="top"><span class="badge">{names[START]}</span></div>'
+              f'<div class="r">You can never win, enforced by {field(rows[START], "sub", START)}</div>'
+              f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {h}</div>'
+              f'<div class="h"><b>When to use it.</b> {u} {ARTICLE_LINK}.</div></div>\n')
+    t = t[:pos.start()] + static + t[pos.end():]
+    t = once(t, '<div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div>',
+             f'<div class="card slot" id="card"><div class="top"><span class="badge">{names[START]}</span></div>', "static result slot")
+
+    # the title, a noindex meta in the outer head, and the two CSS lines in the page's own stylesheet
+    t = once(t, "<title>Unwinnable Maze</title>", "<title>Unwinnable Maze (preview)</title>", "title")
+    t = once(t, "<head><meta http-equiv=", '<head><meta name="robots" content="noindex"><meta http-equiv=', "outer head")
+    sheet = '<link rel="stylesheet" href="fonts/fonts.css">\n<style>\n'
+    if t.count(sheet) != 1:
+        sys.exit(f"make-wip-page: page stylesheet: expected 1 match, found {t.count(sheet)}")
+    style_end = t.find("</style>", t.index(sheet))
     if style_end < 0:
-        sys.exit("make-wip-page: no style block")
+        sys.exit("make-wip-page: page stylesheet has no end")
     t = t[:style_end] + CSS + t[style_end:]
 
     OUT.write_text(t, encoding="utf-8")
-    print(f"OK wip.html ({len(t)} bytes)")
+    print(f"OK wip.html ({len(t.encode('utf-8'))} bytes)")
 
 
 if __name__ == "__main__":

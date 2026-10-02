@@ -1,12 +1,9 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src https://api.anthropic.com"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}.wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
-.card.pos .h+.h{margin-top:8px}
-</style></head><body>
+<!doctype html><html><head><meta name="robots" content="noindex"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src https://api.anthropic.com"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 
 <!doctype html>
 <html><head><meta charset="utf8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 
 <title>Unwinnable Maze (preview)</title>
-<meta name="robots" content="noindex">
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
 :root{
@@ -210,6 +207,8 @@ figure.panel{padding:18px 18px 14px}
 .keybox summary{cursor:pointer;color:var(--teal);font-weight:600;padding:10px 0}
 .keybox ol{margin:4px 0 8px;padding-left:20px}
 .keybox details p{margin:0}
+.wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
+.card.pos .h+.h{margin-top:8px}
 </style>
 
 <div class="wrap" data-blocks="">
@@ -236,7 +235,7 @@ figure.panel{padding:18px 18px 14px}
   <div class="seg" id="seg"><button class="on"><span>Nothing</span><small>nobody</small></button><button><span>Prose</span><small>a sentence</small></button><button class="off" disabled="" title="not choosable: nobody trained a model about this game"><span>Weights</span><small>not choosable</small></button><button><span>Human</span><small>you approve it</small></button><button><span>Judge</span><small>a model reads it</small></button><button><span>Code (tests)</span><small>20 playthroughs</small></button><button><span>Code (proof)</span><small>every state</small></button><button><span>Construction</span><small>the type itself</small></button><button><span>Capability</span><small>no tool</small></button></div>
   <div class="wnote">Weights is on the switch but cannot be chosen: nobody trained a model never to make this game winnable.</div>
   </div>
-  <div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div><div class="r">You can never win, enforced by nobody</div><div class="h"><b>What it is.</b> Nothing means nobody is checking anything. It is the baseline every other enforcer is measured against.</div><div class="h"><b>In this game.</b> Nobody checks. The game still starts walled off, like every position. Ask for the wall to go and it goes. This is the baseline every other position is measured against.</div><div class="h"><b>When to use it.</b> When a broken rule costs you little, like a style preference. Write it down anyway, so others know it is unenforced. <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">Read more in the article</a>.</div></div>
+  <div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div><div class="r">You can never win, enforced by nobody</div><div class="h"><b>What it is.</b> Nothing means nobody is checking anything. It is the baseline every other enforcer is measured against.</div><div class="h"><b>In this game.</b> Nobody checks. The game still starts walled off, like every position. Ask for the wall to go and it goes. This is the baseline every other position is measured against.</div><div class="h"><b>When to use it.</b> When a broken rule costs you little, like a style preference. Write it down anyway, so others know it is unenforced. <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281" target="_blank" rel="noopener">Read more in the article</a>.</div></div>
 </div>
 
 <div class="grid" data-noedit="">
@@ -285,7 +284,7 @@ figure.panel{padding:18px 18px 14px}
     <div class="row"><span class="note" id="status"></span></div>
     <div id="approve"></div>
     <div class="row" id="cardhd" style="margin-top:12px" hidden=""><span class="note" style="margin:0"></span></div>
-    <div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div><div class="hint">checks what you ask. Its verdict appears here.</div></div>
+    <div class="card slot" id="card"><div class="top"><span class="badge">Nothing</span></div><div class="hint">checks what you ask. Its verdict appears here.</div></div>
     <div class="row" style="margin-top:12px"><span class="note" style="margin:0">Activity log. It keeps everything from this visit, including play, until you clear it:</span></div>
     <div class="log" id="log" aria-live="polite"></div>
     <div class="vault" id="vault" hidden=""><a class="vlink" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener" aria-label="Try to win"><canvas class="dot" id="vdot" width="20" height="20" aria-hidden="true"></canvas></a><span>This pellet is outside the playable world. Winning needs every pellet, but no rule you type can reach this one: the program has no coordinates for it. If you really want to win, you can try clicking it.</span></div>
@@ -1820,7 +1819,7 @@ function bugLink(){ const title='Rule broken under Code (proof)'; const body='Th
 // the position's own explanation sits beside the switch it explains (Mo, 2026-09-23: "it explains what each switch does"); the result card keeps the verdict and everything a request produces, and sits above the log since v7.28 (Mo, 2026-09-24: "swap the location of those two boxes, make log bottom one")
 // v40: while the Canned changes tab is hidden the position cards do not mention it (Capability's clause, and the Code (proof) card's, which every reader sees first)
 function posH(m){ return cannedShown() ? m.h : m.h.replace('the canned changes are disabled and ','').replace('a canned change runs its repaired version, ',''); }
-function renderPos(){ const m=MODES.find(x=>x.id===mode); const el=document.getElementById('pos'); if(!el) return; el.innerHTML=`<div class="top"><span class="badge">${m.name}</span></div><div class="r">You can never win, enforced by ${m.sub}</div><div class="h"><b>What it is.</b> ${m.def}</div><div class="h"><b>In this game.</b> ${posH(m)}</div><div class="h"><b>When to use it.</b> ${m.use} <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">Read more in the article</a>.</div>`; }   // v40 (Mo, 2026-09-28): no "holds while" line, "extra words not necessary"
+function renderPos(){ const m=MODES.find(x=>x.id===mode); const el=document.getElementById('pos'); if(!el) return; el.innerHTML=`<div class="top"><span class="badge">${m.name}</span></div><div class="r">You can never win, enforced by ${m.sub}</div><div class="h"><b>What it is.</b> ${m.def}</div><div class="h"><b>In this game.</b> ${posH(m)}</div><div class="h"><b>When to use it.</b> ${m.use} <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281" target="_blank" rel="noopener">Read more in the article</a>.</div>`; }   // v40 (Mo, 2026-09-28): no "holds while" line, "extra words not necessary"
 // the choice rows, one source for the result card and for the in-view choice beside the status (Mo, 2026-09-23: the buttons sat under the fold and the game looked stuck)
 function rowMore(){ return `<div class="row"><button class="btn primary" data-more="1">Ask the AI for 6 more programs</button>${continuation&&continuation.longer?'<button class="btn" data-longer="1">'+offerLabel(continuation.longer)+'</button>':''}<button class="btn" data-leave="1">Leave it</button></div>`; }
 function rowLonger(L){ return `<div class="row"><button class="btn primary" data-longer="1">${offerLabel(L)}</button><button class="btn" data-go="1">Don't wait. Throw this program away and have the AI rewrite a smaller program</button></div>`; }
