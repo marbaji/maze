@@ -42,12 +42,13 @@ def article_link(anchor):
 START = "nothing"   # the position the page opens on; must be an id in MODES and not a disabled one
 
 # weakest to strongest; def and use are shortened from the article's own sentences, except Nothing's, which are Mo's
-# own from the review page (2026-10-02)
+# own from the review page (2026-10-02). He later asked for Nothing's card to be tightened ("when I copyedited I bloated
+# it"); its second "when to use it" sentence is his idea from a comment on the flow-chart mockup, tightened.
 MODES = [
     ("nothing", '"Nothing" means nobody is checking any rules and anything you ask for goes. It is the baseline every other '
                 'enforcer is measured against.',
-     "When a broken rule costs you little, like a style preference. Or when you're keeping a backlog of rules you want "
-     "to build enforcers for in a doc somewhere, but haven't gotten around to wiring them yet."),
+     "When a broken rule costs you little, like a style preference. Or to keep a wishlist of rules in a backlog doc as "
+     "they come to mind, so you don't forget to build them later."),
     ("prose", "Prose is a sentence in the prompt, and nothing checks the result.",
      "For preferences, not rules. Anything you can live with being ignored one time in twenty."),
     ("weights", "Weights means the model was trained to follow the rule, so the rule comes out of the model itself.",
@@ -123,7 +124,7 @@ START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maz
              'way for every player every time.</p>\n')
 
 SWNOTE_OLD = "The mechanisms that enforce it are ordered strongest to weakest. Switch between them and see if you can break the rule."
-SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is the one enforcer switch that cannot be chosen, "
+SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is the one that cannot be chosen, "
               "because nobody has trained an LLM specifically to make this game unwinnable.")
 # Mo folded the Weights sentence into the switch note, so the separate note under the switch goes. The page's flip()
 # scrolled to that note for a disabled position; it now scrolls to the switch note (no link on the page calls flip()
@@ -196,8 +197,8 @@ GUIDE_STEP_NEW = ("If it asks you to buy usage credits, the smallest amount of $
 # enforcer. "position" stays where it means a game position (the search's counts) or a place in a list.
 COPY_EDITS = [
     ("h:'Nobody checks. The game still starts walled off, like every position. Ask for the wall to go and it goes. This is the baseline every other position is measured against.'",
-     'h:\'The game still starts walled off, as it does under every enforcer. Ask for the wall to go and it goes, because no mechanism is checking the "You can never win" rule. This is the baseline every other enforcer is measured against.\'',
-     1, 'Nothing card, in this game (his edit; "like every position" reworded for his position-to-enforcer comment)'),
+     'h:\'Ask for the wall to go and it goes, because no mechanism is checking the "You can never win" rule.\'',
+     1, 'Nothing card, in this game (his edit from the first round, tightened at his word: the sentence true of every switch and the repeated baseline sentence are gone)'),
     ('You can never win, enforced by ',
      'The rule "You can never win" is enforced by ',
      2, "the line under each card's badge"),
@@ -245,35 +246,15 @@ COPY_EDITS = [
     ('''const NO_WIN_TEXT="No. This game cannot be won and you cannot just ask me to win it. Come on now, you're more creative than that. Ask me for something else.";''',
      '''const NO_WIN_TEXT="This game cannot be won and you cannot just ask me to win it. Come on now, you're more creative than that. Ask me for something else. Get jiggy with it.";''',
      1, 'the card after a bare demand to win'),
-    # --- carried from that round to the other enforcers, for one vocabulary: the closing sentence he rewrote, and "the
-    # writer", which he replaced with "the AI" (the page's other name for the same thing, and the one he uses).
+    # --- carried from that round to the other enforcers: the closing sentence he rewrote. ("The writer" was also changed
+    # to "the AI" here for a few hours; he did not like it, so the page keeps "the writer", and the flow chart is where a
+    # reader meets the word.)
     ('Play it and see.',
      'Play the game and see.',
      4, 'the closing sentence of a card whose search could not say (his wording under Nothing, carried to the others)'),
-    ('and the writer does what it is asked.',
-     'and the AI does what it is asked.',
-     1, 'Prose answer (writer to AI)'),
-    (r"inside the writer\'s longer instructions",
-     r"inside the AI\'s longer instructions",
-     1, 'Prose explanation (writer to AI)'),
-    (r"one line in the writer\'s instructions",
-     r"one line in the AI\'s instructions",
-     1, 'Prose answer after the rule broke (writer to AI)'),
-    (r"one sentence in the writer\'s instructions: ",
-     r"one sentence in the AI\'s instructions: ",
-     2, 'Prose cards: the search could not say, and the rule broke (writer to AI)'),
-    ('every other sentence the writer reads',
-     'every other sentence the AI reads',
-     1, 'Prose card after the rule broke (writer to AI)'),
-    (r"The summary is the writer\'s own words",
-     r"The summary is the AI\'s own words",
-     1, 'Human card after approving from the summary (writer to AI)'),
-    (r"the program\'s text and the writer\'s note",
-     r"the program\'s text and the AI\'s note",
-     1, 'Judge explanation (writer to AI)'),
-    (r"reading the program and the writer\'s note",
-     r"reading the program and the AI\'s note",
-     1, 'Judge card after the judge let a change through (writer to AI)'),
+    (r"One sentence in the AI\'s instructions: never make the game winnable.",
+     r"One sentence in the writer\'s instructions tells it never to make the game winnable.",
+     1, 'Prose card, in this game (his comment: the colon made it read as a quotation of the sentence, which it is not)'),
     # --- his rulings in chat after that round (2026-10-02): "yes to 'spooky monsters' throughout" (the game's fixed text;
     # the program's own code and what the AI is told still say ghosts, since the page draws the kind 'ghost'); the line
     # under the badge for Human and Judge (BY, below); and a fixed line on the card after a bare demand to win, in place
