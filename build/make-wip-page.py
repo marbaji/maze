@@ -51,7 +51,9 @@ MODES = [
 ]
 
 # The copy below is Mo's own, saved on the editable copy page on 2026-10-01 and carried here as he wrote it
-# (non-breaking spaces and trailing line breaks left by the in-page editor are dropped; nothing else is changed).
+# (non-breaking spaces and trailing line breaks left by the in-page editor are dropped). One word is held back pending
+# his ruling: he wrote "the encrypted field below", and the key field is masked, not encrypted (the key sits in the
+# tab's session storage and goes only to Anthropic), so the word "encrypted" is left out rather than published.
 TITLE_OLD = "  <h1>The Unwinnable Maze</h1>\n"
 TITLE_NEW = "  <h1>How To Make AI Follow Your Instructions, Every Time</h1>\n"
 
@@ -97,7 +99,7 @@ START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maz
              'progressing through them in order.<br><br>The entire program is code that runs live on this page, except '
              'for the AI that takes in your ask and rebuilds that program. That would be a light Opus call to your '
              "account, so if you'd like to try this game out you can put a dollar or a couple on an expiring API key and "
-             "paste it in the encrypted field below (if you don't know how to do that, there's a guide that helps you) "
+             "paste it in the field below (if you don't know how to do that, there's a guide that helps you) "
              "and you can keep playing for as long as you'd like.</p>\n"
              '  <p>There are a few canned changes, like "remove the walls" or "give me a jetpack" that I\'ve run from my '
              'account and saved their code so I can have a route that work without an API key for those who want to play. '
@@ -107,8 +109,9 @@ START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maz
 SWNOTE_OLD = "The mechanisms that enforce it are ordered strongest to weakest. Switch between them and see if you can break the rule."
 SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is on the switch but cannot be chosen; because "
               "nobody has trained an LLM specifically to make this game unwinnable.")
-# Mo folded the Weights sentence into the switch note, so the separate note under the switch goes, and a click on the
-# disabled Weights button scrolls to the switch note instead
+# Mo folded the Weights sentence into the switch note, so the separate note under the switch goes. The page's flip()
+# scrolled to that note for a disabled position; it now scrolls to the switch note (no link on the page calls flip()
+# today, only the test hook, but it would throw on a missing element)
 WNOTE_OLD = ('  <div class="wnote">Weights is on the switch but cannot be chosen: nobody trained a model never to make '
              'this game winnable.</div>\n')
 WNOTE_JS_OLD = "target.parentElement.querySelector('.wnote').scrollIntoView("
@@ -188,10 +191,15 @@ def main():
     if START not in rows or "disabled:true" in rows[START]:
         sys.exit(f"make-wip-page: START {START!r} is not a choosable MODES id")
     t = once(t, "let mode='proof'; let programBy=null;", f"let mode='{START}'; let programBy=null;", "default mode")
-    # the copy above the switch is hand-written and names the opening position; fail rather than ship it stale
+    # the copy above the switch is hand-written and states three things the tables above decide: the opening position
+    # by name, that it is the first position on the switch, and the enforcers in order; fail rather than ship it stale
     start_name = field(rows[START], "name", START)
-    if f'"{start_name}' not in START_NEW:
-        sys.exit(f'make-wip-page: the copy above the switch does not name the opening position "{start_name}"')
+    if f'The first switch, "{start_name},"' not in START_NEW or MODES[0][0] != START:
+        sys.exit(f'make-wip-page: the copy above the switch calls "{start_name}" the first switch; START and MODES no longer agree with it')
+    listed = ", ".join(field(rows[mid], "name", mid).lower() for mid, _, _ in MODES[1:])
+    listed = listed[:listed.rindex(", ")] + ", and " + listed[listed.rindex(", ") + 2:]
+    if f"The 8 enforcers are: {listed}." not in START_NEW:
+        sys.exit(f"make-wip-page: the copy above the switch does not list the enforcers in the switch's order: {listed}")
 
     # the card: what it is, what it does in this game, when to use it, and the article
     card_old = "<div class=\"h\">${posH(m)}</div>`; }"
@@ -232,7 +240,7 @@ def main():
     t = once(t, '<div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div>',
              f'<div class="card slot" id="card"><div class="top"><span class="badge">{names[START]}</span></div>', "static result slot")
 
-    # the title, a noindex meta in the outer head, and the two CSS lines in the page's own stylesheet
+    # the title, a noindex meta in the outer head, and the CSS lines in the page's own stylesheet
     t = once(t, "<title>Unwinnable Maze</title>", "<title>Unwinnable Maze (preview)</title>", "page title")
     t = once(t, "<head><meta http-equiv=", '<head><meta name="robots" content="noindex"><meta http-equiv=', "outer head")
     sheet = '<link rel="stylesheet" href="fonts/fonts.css">\n<style>\n'
