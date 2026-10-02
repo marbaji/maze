@@ -212,6 +212,8 @@ figure.panel{padding:18px 18px 14px}
 .read h1{max-width:none}
 @media (min-width:1100px){.sw .swnote{font-size:12px}}
 footer{max-width:none}
+.opts{display:flex;flex-wrap:wrap;justify-content:center;max-width:623px;margin-inline:auto}
+.opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}
 </style>
 
 <div class="wrap" data-blocks="">
@@ -265,7 +267,7 @@ footer{max-width:none}
     <p class="note" id="cannedwhy" hidden=""></p>
     <div id="quickPane" hidden="">
       <div class="row" style="margin:0 0 10px"><button class="btn" id="resetTop">Reset</button><span class="note" id="quicknote" style="margin:0"></span></div>
-      <div class="opts" id="opts"><button class="opt"><b>Open the pocket</b><small>remove the four walls around the boxed-in pellet</small></button><button class="opt"><b>Remove every wall</b><small>only the border remains</small></button><button class="opt"><b>A wormhole</b><small>from a dead end at the top left, out onto the boxed-in pellet</small></button><button class="opt"><b>A jetpack</b><small>fly over any inner wall</small></button><button class="opt"><b>A drill</b><small>walking into a wall eats the wall</small></button><button class="opt"><b>A knife</b><small>touching a ghost removes it instead of costing a life</small></button><button class="opt"><b>No ghosts</b><small>nothing chases you</small></button><button class="opt"><b>Gravity</b><small>every move falls as far as it can</small></button><button class="opt"><b>Two squares a step</b><small>every move goes two squares</small></button></div>
+      <div class="opts" id="opts"><button class="opt"><b>Open the pocket</b><small>remove the four walls around the boxed-in pellet</small></button><button class="opt"><b>Remove every wall</b><small>only the border remains</small></button><button class="opt"><b>A wormhole</b><small>from a dead end at the top left, out onto the boxed-in pellet</small></button><button class="opt"><b>A jetpack</b><small>fly over any inner wall</small></button><button class="opt"><b>A drill</b><small>walking into a wall eats the wall</small></button><button class="opt"><b>A knife</b><small>touching a ghost removes it instead of costing a life</small></button><button class="opt"><b>No ghosts</b><small>nothing chases you</small></button><button class="opt"><b>Gravity</b><small>every move falls as far as it can</small></button></div>
     </div>
     <div id="freePane">
       <textarea id="q" placeholder="remove the walls around the one walled-in pellet to the right"></textarea>
@@ -499,7 +501,7 @@ function rep2(src, old, neu) { const n = src.split(old).length - 1; if (n !== 1)
 const D = DEFAULT_PROGRAM;
 const POCKET_MAP = (s) => rep2(rep2(s, '"####.#       #.#.##"', '"####.#           ##"'), '"####.### # ###.####",\n"####.#', '"####.### # ###.# ##",\n"####.#');
 const NOWALLS_MAP = (s) => rep2(s, "if (ch === '#') WALLS = WALLS.concat([x + ',' + y]);", "if (ch === '#' && (x === 0 || y === 0 || x === W - 1 || y === H - 1)) WALLS = WALLS.concat([x + ',' + y]);");
-const WORMHOLE_MAP = (s) => rep2(rep2(s, '"###################",\n"#........#........#",\n"#.##.###', '"###################",\n"# .......#........#",\n"###..###'), "  if (!open(nx, ny)) return null;\n  return { ...s, x: nx, y: ny };", "  if (!open(nx, ny)) return null;\n  if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };\n  return { ...s, x: nx, y: ny };");
+const WORMHOLE_MAP = (s) => rep2(rep2(rep2(s, '"###################",\n"#........#........#",\n"#.##.###', '"###################",\n"# .......#........#",\n"###..###'), "  if (!open(nx, ny)) return null;\n  return { ...s, x: nx, y: ny };", "  if (!open(nx, ny)) return null;\n  if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };\n  return { ...s, x: nx, y: ny };"), "  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };", "  cells[cells.length] = { x: 1, y: 1, k: 'portal' }; cells[cells.length] = { x: 16, y: 7, k: 'portal' };   // both mouths drawn, so the player sees the ride\n  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };");
 const QUICK = [
  {id:'pocket', name:'Open the pocket', desc:'remove the four walls around the boxed-in pellet', why:"this version can be won: the four walls around the pocket on the right are gone, so a path reaches every pellet.", src: POCKET_MAP(D)},
  {id:'nowalls', name:'Remove every wall', desc:'only the border remains', why:"this version can be won: every inner wall is gone, so a path reaches every pellet.", src: NOWALLS_MAP(D)},
@@ -509,7 +511,6 @@ const QUICK = [
  {id:'knife', name:'A knife', desc:'touching a ghost removes it instead of costing a life', why:"the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; a knife for the ghosts does not touch a wall.", src: rep2(D, "if (hit) return { ...sc, t: sc.t + 1, ghosts: [[8, 7], [9, 7]], lives: sc.lives - 1 };", "if (hit) return { ...sc, t: sc.t + 1, ghosts: ghosts.filter(([gx, gy]) => !(gx === s.x && gy === s.y)) };")},
  {id:'noghosts', name:'No ghosts', desc:'nothing chases you', why:"the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; taking the ghosts away does not touch a wall.", src: rep2(D, "function scene0() { return { ghosts: [[8, 7], [9, 7]], lives: 3, t: 0 }; }", "function scene0() { return { ghosts: [], lives: 3, t: 0 }; }")},
  {id:'gravity', name:'Gravity', desc:'every move falls as far as it can', why:"the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; a fall stops at a wall like any move.", src: rep2(D, "const nx = s.x + d[0], ny = s.y + d[1];\n  if (!open(nx, ny)) return null;", "const nx = s.x + d[0]; let ny = s.y + d[1];\n  if (!open(nx, ny)) return null;\n  while (open(nx, ny + 1)) ny++;")},
- {id:'step2', name:'Two squares a step', desc:'every move goes two squares', why:"the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it; a two-square step needs both squares open, so it cannot cross a wall.", src: rep2(D, "const nx = s.x + d[0], ny = s.y + d[1];\n  if (!open(nx, ny)) return null;", "const mx = s.x + d[0], my = s.y + d[1]; const nx = s.x + 2 * d[0], ny = s.y + 2 * d[1];\n  if (!open(mx, my) || !open(nx, ny)) return null;")},
 ];
 
 // ================= canned repairs: the same change, kept whole, with the rule held by something else =================
@@ -531,7 +532,7 @@ const REPAIRS = {
   "  const d = DIR[a]; if (!d) return null;\n  const nx = s.x + d[0], ny = s.y + d[1];\n  if (!open(nx, ny)) return null;\n  if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };",
   "  const d = DIR[a]; if (!d) return null;\n  if (s.x === 16 && s.y === 7) return { ...s, x: 1, y: 1 };   // from the pocket, every move rides the wormhole back\n  const nx = s.x + d[0], ny = s.y + d[1];\n  if (!open(nx, ny)) return null;\n  const m = mouth(s);\n  if (!s.caught && nx === m[0] && ny === m[1]) return { ...s, x: nx, y: ny, caught: true };   // a plain step onto the pellet eats it\n  if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };"),
   "function scene0()", "function goal(s) { return s.caught; }\nfunction scene0()"),
-  "  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };", "  if (!s.caught) { const m = mouth(s); cells[cells.length] = { x: m[0], y: m[1], k: 'pellet' }; }\n  cells[cells.length] = { x: 1, y: 1, k: 'portal' }; cells[cells.length] = { x: 16, y: 7, k: 'portal' };   // both mouths drawn, so the player sees the ride\n  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };"),
+  "  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };", "  if (!s.caught) { const m = mouth(s); cells[cells.length] = { x: m[0], y: m[1], k: 'pellet' }; }\n  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };"),
  jetpack: rep2(rep2(D, "const open = (x, y) =>", "const inside = (x, y) => x > 0 && x < W - 1 && y > 0 && y < H - 1;\nconst open = (x, y) =>"),
   "  const nx = s.x + d[0], ny = s.y + d[1];\n  if (!open(nx, ny)) return null;\n  return { ...s, x: nx, y: ny };",
   "  let nx = s.x + d[0], ny = s.y + d[1];\n  if (!inside(nx, ny)) return null;\n  if (open(nx, ny)) return { ...s, x: nx, y: ny };\n  // a flight: straight over the walls, down on the first open square, and only if open ground lies beyond it (the runway)\n  while (inside(nx, ny) && !open(nx, ny)) { nx = nx + d[0]; ny = ny + d[1]; }\n  if (!inside(nx, ny) || !open(nx + d[0], ny + d[1])) return null;\n  return { ...s, x: nx, y: ny };"),

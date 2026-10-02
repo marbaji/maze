@@ -148,6 +148,22 @@ FOOT_OLD = 'a programming language that makes an AI prove its code still keeps t
 FOOT_NEW = ('a programming language that makes an AI prove its code still keeps the rules you declare, which is the '
             '"Code (proof)" enforcer in our game. This page\'s')
 
+# The canned changes (Mo, 2026-10-01): "Two squares a step" is removed; the last row of cards is centred; and the
+# wormhole's two mouths are drawn in the plain version too (the page's repaired version already drew them, the plain one
+# drew nothing, so the ride was invisible). Behaviour is unchanged: only the program's render() gains the two rings.
+STEP2_BUTTON = '<button class="opt"><b>Two squares a step</b><small>every move goes two squares</small></button>'
+WORM_HEAD_OLD = "const WORMHOLE_MAP = (s) => rep2(rep2(s, "
+WORM_HEAD_NEW = "const WORMHOLE_MAP = (s) => rep2(rep2(rep2(s, "
+WORM_TAIL_OLD = r'if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };\n  return { ...s, x: nx, y: ny };");'
+PLAYER_LINE = "  cells[cells.length] = { x: s.x, y: s.y, k: 'player' };"
+PORTAL_LINE = ("  cells[cells.length] = { x: 1, y: 1, k: 'portal' }; cells[cells.length] = { x: 16, y: 7, k: 'portal' };"
+               "   // both mouths drawn, so the player sees the ride")
+WORM_TAIL_NEW = (r'if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };\n  return { ...s, x: nx, y: ny };"), '
+                 + '"' + PLAYER_LINE + '", "' + PORTAL_LINE + r"\n" + PLAYER_LINE + '");')
+# the repaired wormhole is built on the plain one, which now draws the mouths, so its own copy of that line goes
+WORM_FIX_OLD = r"k: 'pellet' }; }\n" + PORTAL_LINE + r"\n" + PLAYER_LINE + '"),'
+WORM_FIX_NEW = r"k: 'pellet' }; }\n" + PLAYER_LINE + '"),'
+
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
        ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
@@ -157,7 +173,12 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        # Only from 1100px wide, where the column is at full width: below that the smaller size saves no line.
        "@media (min-width:1100px){.sw .swnote{font-size:12px}}\n"
        # the footer runs under both columns (Mo, 2026-10-01); the live page stops it at 80ch
-       "footer{max-width:none}\n")
+       "footer{max-width:none}\n"
+       # the canned-change cards: a wrapping row instead of a grid, so a short last row sits in the middle. Each card is
+       # a third of the row where three fit (466px and up) and half of it below that, never wider, so every card in
+       # every row has the same width; the block itself stops at three across.
+       ".opts{display:flex;flex-wrap:wrap;justify-content:center;max-width:623px;margin-inline:auto}\n"
+       ".opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}\n")
 
 
 def once(text, old, new, what):
@@ -211,6 +232,14 @@ def main():
     for old, new in ASK_SINKS:
         t = once(t, old, new, f"message sink {old}")
     t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
+
+    # the canned changes
+    step2 = one(r"^ \{id:'step2', name:'Two squares a step',.*\n", t, "step2 row", re.M)
+    t = t[:step2.start()] + t[step2.end():]
+    t = once(t, STEP2_BUTTON, "", "static step2 card")
+    t = once(t, WORM_HEAD_OLD, WORM_HEAD_NEW, "wormhole map head")
+    t = once(t, WORM_TAIL_OLD, WORM_TAIL_NEW, "wormhole map tail")
+    t = once(t, WORM_FIX_OLD, WORM_FIX_NEW, "repaired wormhole portal line")
 
     # the MODES table: reorder weakest first, add def and use to each row
     m = one(r"const MODES=\[\n(.*?)\n\];", t, "MODES table", re.S)
