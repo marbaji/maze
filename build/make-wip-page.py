@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build wip.html, a work-in-progress preview of the play page, from the built index.html.
 
-Usage: build/make-wip-page.py   (reads index.html at the repo root, writes wip.html beside it)
+Usage: build/make-wip-page.py   (reads index.html at the repo root, writes wip.html beside it; also reads
+guide/index.html and writes the preview's copy of the picture guide, guide/wip.html)
 
 The preview is the game-first version Mo asked for on 2026-10-01: the page stands on its own (a short intro, the article
 linked as the reference), the switch runs weakest to strongest and starts on Nothing, and each enforcer's card says what
@@ -134,7 +135,7 @@ ASK_MSG_OLD = ('"To use Ask anything, paste an Anthropic API key below. It stays
 ASK_MSG_NEW = ('"To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
                'Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything '
                'else, including the checking of the program, the search and the game itself, is code that runs on this '
-               'page, so you can read it with View Source; the same code is published at '
+               "page, so you can inspect this page's source and read it, or read the same code at "
                "<a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. "
                'Until then, you can use the \\"Canned changes\\" mode, which are saved ready-made changes that run '
                'without an API key.";')
@@ -164,14 +165,27 @@ WORM_TAIL_NEW = (r'if (nx === 1 && ny === 1) return { ...s, x: 16, y: 7 };\n  re
 WORM_FIX_OLD = r"k: 'pellet' }; }\n" + PORTAL_LINE + r"\n" + PLAYER_LINE + '"),'
 WORM_FIX_NEW = r"k: 'pellet' }; }\n" + PLAYER_LINE + '"),'
 
+# The preview's own copy of the picture guide (guide/wip.html, built from guide/index.html, which is the live guide and
+# is not changed). Mo, 2026-10-02, on the step about buying credits: "Remember even if you put money on your API key
+# what you don't use will stay in your account. We're just putting a little bit of money on it so you can play wihtout
+# interruption ... or some version of that". "for up to a year" is added because Anthropic's credits expire a year
+# after purchase (support.claude.com, "How do I pay for my Claude API usage?", read 2026-10-02).
+GUIDE_SRC = ROOT / "guide" / "index.html"
+GUIDE_OUT = ROOT / "guide" / "wip.html"
+GUIDE_STEP_OLD = ("If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type "
+                  "$2-3. Leave Auto-reload off.")
+GUIDE_STEP_NEW = ("If it asks you to buy usage credits, the smallest amount of $5 is plenty, or choose Other and type "
+                  "$2-3. Remember, whatever you don't use stays in your account for up to a year. You're just putting "
+                  "a little money on it so you can play without interruption. Leave Auto-reload off.")
+
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
        ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
        ".read h1{max-width:none}\n"
        # the switch note at 12px, the largest size at which its two sentences fit on two lines in the desktop column
        # (measured: 14, 13 and 12.5px give three; Mo, 2026-10-01: "a little smaller so it fits on 2 lines instead of 3").
-       # Only from 1100px wide, where the column is at full width: below that the smaller size saves no line.
-       "@media (min-width:1100px){.sw .swnote{font-size:12px}}\n"
+       # One size at every width (Mo, 2026-10-02: "it shoul keep the current size now and not save two sizes").
+       ".sw .swnote{font-size:12px}\n"
        # the footer runs under both columns (Mo, 2026-10-01); the live page stops it at 80ch
        "footer{max-width:none}\n"
        # the canned-change cards: a wrapping row instead of a grid, so a short last row sits in the middle. Each card is
@@ -336,8 +350,20 @@ def main():
     words = len(html.unescape(re.sub(r"<[^>]+>", "", art)).split())
     t = once(t, WORDS_TOKEN, str(words), "word count")
 
+    # the preview's copy of the picture guide, linked from the preview's key box
+    g = GUIDE_SRC.read_text(encoding="utf-8")
+    g = once(g, GUIDE_STEP_OLD, GUIDE_STEP_NEW, "guide: credits step")
+    g = once(g, "<title>Get a key for the maze</title>",
+             '<title>Get a key for the maze (preview)</title>\n<meta name="robots" content="noindex">', "guide: title")
+    if g.count('href="../#read-play"') != 2:
+        sys.exit(f"make-wip-page: guide: expected 2 links back to the maze, found {g.count('href=\"../#read-play\"')}")
+    g = g.replace('href="../#read-play"', 'href="../wip.html#read-play"')
+    t = once(t, '<a href="guide/">How to get a key (2 minutes)</a>', '<a href="guide/wip.html">How to get a key (2 minutes)</a>',
+             "link to the guide")
+
     OUT.write_text(t, encoding="utf-8")
-    print(f"OK wip.html ({len(t.encode('utf-8'))} bytes, {words} words above the game)")
+    GUIDE_OUT.write_text(g, encoding="utf-8")
+    print(f"OK wip.html ({len(t.encode('utf-8'))} bytes, {words} words above the game) and guide/wip.html ({len(g.encode('utf-8'))} bytes)")
 
 
 if __name__ == "__main__":

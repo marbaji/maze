@@ -210,7 +210,7 @@ figure.panel{padding:18px 18px 14px}
 .wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}
 .card.pos .h+.h{margin-top:8px}
 .read h1{max-width:none}
-@media (min-width:1100px){.sw .swnote{font-size:12px}}
+.sw .swnote{font-size:12px}
 footer{max-width:none}
 .opts{display:flex;flex-wrap:wrap;justify-content:center;max-width:623px;margin-inline:auto}
 .opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}
@@ -282,7 +282,7 @@ footer{max-width:none}
         <div class="keyrow"><input id="keyinput" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"><button id="keysave" type="button">Use key</button></div>
         <p id="keystate" class="note" hidden>Key in use: <span id="keymasked"></span> <button id="forgetkey" type="button">Forget key</button></p>
         <p id="keyerr" class="note" role="alert" hidden></p>
-        <p id="keyguide" class="note"><a href="guide/">How to get a key (2 minutes)</a></p>
+        <p id="keyguide" class="note"><a href="guide/wip.html">How to get a key (2 minutes)</a></p>
       </div>
     </div>
     <div class="row"><span class="note" id="status"></span></div>
@@ -1891,7 +1891,7 @@ function noteWait(){ const key=(quizState==='more'||quizState==='longer')?quizSt
 function setTab(t){ askMode=t; document.getElementById('tabQuick').className=t==='quick'?'on':''; document.getElementById('tabFree').className=t==='free'?'on':''; document.getElementById('quickPane').hidden=t!=='quick'; document.getElementById('freePane').hidden=t!=='free'; document.getElementById('reset').hidden=(t==='quick'); }   // the canned pane carries its own Reset above the changes; on the free tab Reset sits on the Ask row after Stop (v40)
 // v40 (Mo, 2026-09-28: "hide canned changes from default, and only if the user doesn't connect their claude then it shows"): the Canned changes tab is hidden
 // until the page learns Claude cannot be used here (a declined permission, or a request refused for access), and a line under the tabs says why
-const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can read it with View Source; the same code is published at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+const CANNED_WHY="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can inspect this page's source and read it, or read the same code at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 function cannedShown(){ return !document.getElementById('tabQuick').hidden; }
 function showCanned(){ if(cannedShown()) return; document.getElementById('tabQuick').hidden=false; const n=document.getElementById('cannedwhy'); n.innerHTML=CANNED_WHY; n.hidden=false; renderPos(); }
 document.getElementById('tabQuick').onclick=()=>setTab('quick'); document.getElementById('tabFree').onclick=()=>{ setTab('free'); permNote(); };
@@ -2100,7 +2100,7 @@ const costSaidKeys=new Set(); function costNote(kind){ const key=kind==='write'?
 let sampleNs=null, ctl=null, pendingApprove=null;
 // ---- the reader's own Anthropic key (the play page): MazeKey owns the key; one function per transition, each ending in sync(), which sets the key box,
 // Send and the capnote from state alone. init() is the one entry point: it runs after capability discovery and returns what sampleNs becomes
-const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can read it with View Source; the same code is published at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+const ASK_MSG="To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can inspect this page's source and read it, or read the same code at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
 const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.", $=id=>document.getElementById(id);
   let mem=null, hosted=false, blocked=false, err='';   // mem: the key when sessionStorage throws (this visit only); blocked: no credit on the key in use
   const stored=()=>{ try{ const v=sessionStorage.getItem(SK); if(v) return v; }catch(e){} return mem; };
