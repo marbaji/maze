@@ -120,6 +120,34 @@ WNOTE_OLD = ('  <div class="wnote">Weights is on the switch but cannot be chosen
 WNOTE_JS_OLD = "target.parentElement.querySelector('.wnote').scrollIntoView("
 WNOTE_JS_NEW = "target.parentElement.querySelector('.swnote').scrollIntoView("
 
+# The message under the key box on the "Ask anything" tab (Mo, 2026-10-01): the repo address is a link, and the points
+# of the paragraph that sat above the ask box ("An Opus-class model writes the program...") are folded into it, at the
+# message's own size and place; that paragraph is removed. The page keeps the same text in two constants (the Ask tab's
+# and the canned tab's copy), so both change, and the three places that wrote it as plain text now write it as HTML
+# (the message is a constant of this page, never reader input).
+ASKP_OLD = ('      <p id="askp">An Opus-class model writes the program. Everything else, including the checking of the '
+            'program, the search and the game itself, is code that runs on the page.</p>\n')
+ASK_MSG_OLD = ('"To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
+               'Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it '
+               'with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the '
+               '\\"Canned changes\\" mode, which are saved ready-made changes that run without an API key.";')
+ASK_MSG_NEW = ('"To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
+               'Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything '
+               'else, including the checking of the program, the search and the game itself, is code that runs on this '
+               'page, so you can read it with View Source; the same code is published at '
+               "<a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. "
+               'Until then, you can use the \\"Canned changes\\" mode, which are saved ready-made changes that run '
+               'without an API key.";')
+ASK_SINKS = [("n.textContent=CANNED_WHY;", "n.innerHTML=CANNED_WHY;"),
+             ("$('capnote').textContent=k?'':ASK_MSG;", "$('capnote').innerHTML=k?'':ASK_MSG;"),
+             ("note.textContent=ASK_MSG;", "note.innerHTML=ASK_MSG;")]
+
+# The footer's sentence about Bend, in Mo's words (2026-10-01). The sentence after it, which says the page's proof
+# enforcer does not use Bend, is left as it was.
+FOOT_OLD = 'a programming language that makes an AI prove its code still keeps the rules you declare. This page\'s'
+FOOT_NEW = ('a programming language that makes an AI prove its code still keeps the rules you declare, which is the '
+            '"Code (proof)" enforcer in our game. This page\'s')
+
 CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
        ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
@@ -174,6 +202,14 @@ def main():
     t = once(t, SWNOTE_OLD, SWNOTE_NEW, "switch note")
     t = once(t, WNOTE_OLD, "", "weights note")
     t = once(t, WNOTE_JS_OLD, WNOTE_JS_NEW, "weights click target")
+
+    # the Ask-tab message and the footer
+    t = once(t, ASKP_OLD, "", "paragraph above the ask box")
+    for const in ("CANNED_WHY", "ASK_MSG"):
+        t = once(t, f"const {const}=" + ASK_MSG_OLD, f"const {const}=" + ASK_MSG_NEW, f"{const} text")
+    for old, new in ASK_SINKS:
+        t = once(t, old, new, f"message sink {old}")
+    t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
 
     # the MODES table: reorder weakest first, add def and use to each row
     m = one(r"const MODES=\[\n(.*?)\n\];", t, "MODES table", re.S)
