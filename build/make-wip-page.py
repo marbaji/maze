@@ -153,8 +153,9 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
        ".read h1{max-width:none}\n"
        # the switch note at 12px, the largest size at which its two sentences fit on two lines in the desktop column
-       # (measured: 14, 13 and 12.5px give three; Mo, 2026-10-01: "a little smaller so it fits on 2 lines instead of 3")
-       ".sw .swnote{font-size:12px}\n"
+       # (measured: 14, 13 and 12.5px give three; Mo, 2026-10-01: "a little smaller so it fits on 2 lines instead of 3").
+       # Only from 1100px wide, where the column is at full width: below that the smaller size saves no line.
+       "@media (min-width:1100px){.sw .swnote{font-size:12px}}\n"
        # the footer runs under both columns (Mo, 2026-10-01); the live page stops it at 80ch
        "footer{max-width:none}\n")
 
