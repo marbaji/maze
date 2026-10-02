@@ -77,7 +77,15 @@ MODES = [
 WORDS_TOKEN = "@@WORDS@@"
 
 TITLE_OLD = "  <h1>The Unwinnable Maze</h1>\n"
-TITLE_NEW = "  <h1>How To Make AI Follow Your Instructions, Every Time</h1>\n"
+# The title is set as a ladder (Mo, 2026-10-02, after a mockup: "I loved laddered title"): four fixed lines, each starting
+# further right, the last ending at the right edge of the reading column. The two middle lines are placed from the last
+# line's width, LADDER_LAST_EM, measured in the title's own type at its desktop size (68px: 325px wide; at the phone's
+# 36px the same line is 5.03em because the face widens at small sizes, which moves the middle lines by under 6px).
+# Measured for the last line named in LADDER_MEASURED_FOR; main() fails if the title's last line changes without it.
+TITLE_LINES = ["How To Make", "AI Follow Your", "Instructions,", "Every Time"]
+LADDER_LAST_EM = 4.78
+LADDER_MEASURED_FOR = "Every Time"
+TITLE_NEW = '  <h1 class="lad">' + " ".join(f"<span>{line}</span>" for line in TITLE_LINES) + "</h1>\n"
 
 INTRO_OLD_RE = re.compile(r'  <p><b>Welcome to the Unwinnable Maze\.</b>.*?Now comes the fun part!</p>\n')
 INTRO_NEW = (
@@ -169,7 +177,7 @@ ASK_MSG_OLD = ('"To use Ask anything, paste an Anthropic API key below. It stays
                'Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it '
                'with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the '
                '\\"Canned changes\\" mode, which are saved ready-made changes that run without an API key.";')
-ASK_MSG_NEW = ('"To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
+ASK_MSG_NEW = ('"To use Ask Me Anything, paste an Anthropic API key below. It stays in this tab until you close it or press '
                'Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything '
                'else, including the checking of the program, the search and the game itself, is code that runs on this '
                "page, so you can inspect this page's source to read it, or read the same exact code at "
@@ -256,7 +264,7 @@ COPY_EDITS = [
      'a knife for the spooky monsters does not touch a wall.',
      1, 'why the knife leaves the game unwinnable (his edit read "the spooky villain"; there are two, and his own copy above the game calls them "the spooky monsters")'),
     (r"""truth:'Yes. No enforcer is in the way: any change that opens the pocket goes straight through.',explain:'No enforcer is in the way, so any change that opens the pocket goes straight through. Switch to your own words and paste this:',""",
-     r"""truth:'Yes. No enforcer is in the way, so any change that opens the pocket goes straight through. Switch to your own words and paste this:',explain:'',""",
+     r"""truth:'Yes. No enforcer is in the way, so any change that opens the pocket goes straight through. Switch to "Ask Me Anything" and paste this:',explain:'',""",
      1, "the answer under Nothing after a change did not get through (his edit, and his comment that the explanation under it was now a duplicate)"),
     ('q+=`<div class="qa hx">${esc(hz.explain)}</div>`+',
      "q+=(hz.explain?`<div class=\"qa hx\">${esc(hz.explain)}</div>`:'')+",
@@ -279,6 +287,31 @@ COPY_EDITS = [
     (r"One sentence in the AI\'s instructions: never make the game winnable.",
      r"One sentence in the writer\'s instructions tells it never to make the game winnable.",
      1, 'Prose card, in this game (his comment: the colon made it read as a quotation of the sentence, which it is not)'),
+    # --- his comments on the Human review page (2026-10-02): the tab is renamed "Ask Me Anything", and under every
+    # enforcer the answer to "could a different one, if you kept trying?" is ONE paragraph that opens with Yes. and ends
+    # with the invitation, the way he merged Nothing's. The merged wording is mine, from the two paragraphs it replaces;
+    # he reads it on the review pages.
+    ('>Ask anything, in your words</button>',
+     '>Ask Me Anything</button>',
+     1, 'the tab for typed requests'),
+    ('Paste an Anthropic API key in the Ask tab and',
+     'Paste an Anthropic API key in the "Ask Me Anything" tab and',
+     1, 'the card when a canned change needs the AI and no key is saved'),
+    (r"""truth:'Yes. The rule is one sentence in the instructions of the AI that writes the program, "'+RULE_SENTENCE+'", and nothing checks the program afterwards. The sentence competes with your request inside the same instructions, and the writer does what it is asked.',explain:'The rule is one sentence inside the writer\'s longer instructions, and it competes with every other sentence there, including your request. Nothing reads the program afterwards, which is why the log says "applied. nobody checked it." Switch to your own words and paste this:',""",
+     r"""truth:'Yes. The rule is one sentence in the writer\'s instructions: "'+RULE_SENTENCE+'" It competes with every other sentence there, including your request, and nothing checks the program afterwards. Switch to "Ask Me Anything" and paste this:',explain:'',""",
+     1, 'Prose: the answer and the explanation under it, merged'),
+    (r"""truth:'Yes. You are the enforcer. The card shows a one-line summary with the whole program folded under it, and people tend to approve from the summary.',explain:'You are the checker, and the summary reads like you got what you asked for. Switch to your own words and paste this (but make sure to read the program it made before you approve it, or at the very least open the program\'s text and scroll all the way to the bottom):',""",
+     r"""truth:'Yes. You are the enforcer. You see a one-line summary with the whole program folded under it, and people tend to approve from the summary, which reads like you got what you asked for. This time, read the program before you approve it, or at the very least open it and scroll all the way to the bottom. Switch to "Ask Me Anything" and paste this:',explain:'',""",
+     1, 'Human: the answer and the explanation under it, merged'),
+    (r"""truth:'Yes. The judge reads the program and the note that came with it, and the note comes from the thing being judged. It can misread a program, and it is not shown the map a program refers to by name.',""",
+     r"""truth:'Yes. The judge is given only two things: the program\'s text and the writer\'s note. It never runs the program, so it can misread one. The page keeps the map (its 151 walls and 122 pellets) in a named list, MAZE, that a program can refer to instead of retyping, and the judge is not given MAZE. So when a program says "take MAZE\'s walls and drop the one at position 76", the judge can only see that some wall was dropped, not which one. Switch to "Ask Me Anything" and paste this:',""",
+     1, 'Judge: the answer and the explanation under it, merged'),
+    ("HINTS.judge.explain=HINTS.judge.why+' Switch to your own words and paste this:';",
+     "HINTS.judge.explain='';",
+     1, 'Judge: no separate explanation row (it is in the answer now)'),
+    (r"""truth:'Yes. Twenty playthroughs are a sample. A win that needs a specific trick is one the players will not find.',explain:'The page\'s twenty players hunt the nearest pellet or wander at random, so a door into the pocket placed at a dead end with no pellet is one they almost never walk into. You can try that. Switch to your own words and paste this:',""",
+     r"""truth:'Yes. Twenty playthroughs are a sample, and a win that needs a specific trick is one the players will not find. The page\'s twenty players hunt the nearest pellet or wander at random, so a door into the pocket placed at a dead end with no pellet is one they almost never walk into. Switch to "Ask Me Anything" and paste this:',explain:'',""",
+     1, 'Code (tests): the answer and the explanation under it, merged'),
     # --- his rulings in chat after that round (2026-10-02): "yes to 'spooky monsters' throughout" (the game's fixed text;
     # the program's own code and what the AI is told still say ghosts, since the page draws the kind 'ghost'); the line
     # under the badge for Human and Judge (BY, below); and a fixed line on the card after a bare demand to win, in place
@@ -312,6 +345,13 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
        ".read h1{max-width:none}\n"
+       # the ladder: the last line is pushed to the column's right edge; the two in between start a third and two thirds
+       # of the way to where the last one starts. No script; with four lines it fits any column 253px or wider.
+       f".read h1.lad{{text-wrap:nowrap;--last:{LADDER_LAST_EM}em}}\n"
+       ".read h1.lad span{display:block;width:fit-content;white-space:nowrap}\n"
+       ".read h1.lad span:nth-child(2){margin-left:calc((100% - var(--last)) / 3)}\n"
+       ".read h1.lad span:nth-child(3){margin-left:calc((100% - var(--last)) * 2 / 3)}\n"
+       ".read h1.lad span:nth-child(4){margin-left:auto}\n"
        # the switch note at 12px, the largest size at which its two sentences fit on two lines in the desktop column
        # (measured: 14, 13 and 12.5px give three; Mo, 2026-10-01: "a little smaller so it fits on 2 lines instead of 3").
        # One size at every width (Mo, 2026-10-02: "it shoul keep the current size now and not save two sizes").
@@ -366,6 +406,8 @@ def main():
     if len(INTRO_OLD_RE.findall(t)) != 1:
         sys.exit("make-wip-page: intro: expected 1 match")
     t = INTRO_OLD_RE.sub(lambda m: INTRO_NEW, t)
+    if len(TITLE_LINES) != 4 or TITLE_LINES[-1] != LADDER_MEASURED_FOR:
+        sys.exit("make-wip-page: the title's lines changed; measure the last line's width in em in the title's type and update LADDER_LAST_EM and LADDER_MEASURED_FOR (the CSS places four lines)")
     t = once(t, TITLE_OLD, TITLE_NEW, "title")
     t = once(t, HEAD_OLD, HEAD_NEW, "play heading")
     t = once(t, START_OLD, START_NEW, "start paragraphs and the rule")
@@ -492,6 +534,8 @@ def main():
     # the preview's copy of the picture guide, linked from the preview's key box
     g = GUIDE_SRC.read_text(encoding="utf-8")
     g = once(g, GUIDE_STEP_OLD, GUIDE_STEP_NEW, "guide: credits step")
+    g = once(g, "open the <b>Ask anything</b> tab", "open the <b>Ask Me Anything</b> tab", "guide: the tab's name")
+    g = once(g, "The maze's Ask anything panel", "The maze's Ask Me Anything panel", "guide: the tab's name in the picture's description")
     g = once(g, "<title>Get a key for the maze</title>",
              '<title>Get a key for the maze (preview)</title>\n<meta name="robots" content="noindex">', "guide: title")
     if g.count('href="../#read-play"') != 2:
