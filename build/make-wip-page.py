@@ -13,7 +13,9 @@ non-zero and writes nothing (the previous wip.html, if any, is left as it was, s
 The opening position is START, and the switch order is the order of MODES below. The script's own table, the starting
 mode, and the static first paint (the switch, the enforcer's card and the result slot shown before the page's script
 runs) are all derived from those two. The copy above the switch is hand-written (Mo's words): the build fails unless
-it names the opening position, and a change of order means rereading that copy by hand.
+it calls the opening position the first switch and that position is first in MODES, and unless MODES holds the eight
+enforcers the copy counts. The copy also says each enforcer is stronger than the one before it, which no build check
+can test, so a change of order still means rereading that copy by hand.
 """
 import re
 import sys
@@ -50,27 +52,27 @@ MODES = [
      "When the agent doesn't need the power. An agent that drafts emails does not need the send button."),
 ]
 
-# The copy below is Mo's own, saved on the editable copy page on 2026-10-01 and carried here as he wrote it
-# (non-breaking spaces and trailing line breaks left by the in-page editor are dropped). One word is held back pending
-# his ruling: he wrote "the encrypted field below", and the key field is masked, not encrypted (the key sits in the
-# tab's session storage and goes only to Anthropic), so the word "encrypted" is left out rather than published.
+# The copy below is Mo's own: his text from the editable copy page (2026-10-01), with the cuts he reviewed on the
+# comparison page and the three changes he left as comments there ("a dollar or a few", "the same way for every player
+# every time", and the sentence about agentic workflows and packaged products). "key field" replaces his first
+# "encrypted field": the field is masked, not encrypted (the key sits in the tab's session storage and goes only to
+# Anthropic).
 TITLE_OLD = "  <h1>The Unwinnable Maze</h1>\n"
 TITLE_NEW = "  <h1>How To Make AI Follow Your Instructions, Every Time</h1>\n"
 
 INTRO_OLD_RE = re.compile(r'  <p><b>Welcome to the Unwinnable Maze\.</b>.*?Now comes the fun part!</p>\n')
 INTRO_NEW = (
     '  <p class="wipnote">Work-in-progress preview. The live game is <a href="./">here</a>.</p>\n'
-    "  <p>We've all been there. We wrote a thoughtful prompt or skill file and were incredibly detailed and organized, "
-    "but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. Perhaps we even "
-    'built a multi-month agentic AI workflow or packaged product with a high degree of sophistication, and you even '
+    "  <p>We've all been there. You wrote a thoughtful prompt or skill file and were incredibly detailed and organized, "
+    "but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. You even "
     'included the iconic "MAKE NO MISTAKES" in all caps with not one, not two, but <b><i>three </i></b>exclamation '
-    'marks. Yet alas, mistakes were made. If you know what you want, how do you make sure the AI actually does it?</p>\n'
-    '  <p>It turns out it has little to do with how you phrase your ask from the AI, and a lot to do with what enforces '
-    'it. An enforcer is the mechanism outside the model that makes sure the instruction or rule you give it is followed, '
-    "and through my work I was able to bucket them into exactly 8 categories. What's so great about today's world is "
-    'that AI can help you with implementing the enforcer mechanisms, as building has become incredibly easy, but you '
-    'still have to understand the 8 enforcers and when to use each.</p>\n'
-    '  <p>I coded an game as a fun way to learn them. If you want to read the definition of each enforcer and when to '
+    'marks. Yet alas, mistakes were made. This same problem could arise in sophisticated AI agentic workflows or '
+    'packaged products as well. If you know what you want, how do you make sure the AI actually does it?</p>\n'
+    '  <p>It turns out it has little to do with how you phrase your ask, and a lot to do with what enforces it. An '
+    'enforcer is the mechanism outside the model that makes sure the instruction or rule you give it is followed, and '
+    'through my work I was able to bucket them into exactly 8 categories. AI can help you implement them, as building '
+    'has become incredibly easy, but you still have to understand the 8 enforcers and when to use each.</p>\n'
+    '  <p>I coded a game as a fun way to learn them. If you want to read the definition of each enforcer and when to '
     f'use it, <a href="{POST_URL}">I also wrote the article</a>.</p>\n')
 
 HEAD_OLD = '<h2 id="read-play">Now try to break the game&nbsp;</h2>'
@@ -83,31 +85,26 @@ START_OLD = ('  <p>The enforcer starts on "Code (proof)", the one you will most 
              '  <p>Start with the request already in the box, "remove the walls around the one walled-in pellet to the right", '
              'and watch the log: the literal change is caught, and the AI rewrites it with your request kept whole.</p>\n'
              f'  <p class="rule">{RULE}</p>\n')
-# names the opening position in words, so main() checks it against START
+# calls the opening position the first switch and counts 8 enforcers, so main() checks both against START and MODES
 START_NEW = ("  <p>You're a round chomper trying to eat all the pellets in a maze while running away from the spooky "
              'monsters. The problem is that the maze starts with one pellet boxed in with walls on all four sides, '
              'preventing you from reaching it. The game has a chat box where you can ask for anything you want and watch '
-             'it materialize, literally you can ask for anything (or become anything). The game only has one rule and '
-             'one rule only</p>\n'
+             'it materialize (or become anything). The game has one rule and one rule only:</p>\n'
              f'  <p class="rule"><i>{RULE}</i></p>\n'
-             '  <p>But like we mentioned above, that rule, like any other rule, can be enforced by one of 8 enforcers. The '
-             'game encodes each enforcer as a switch and lets you switch between them. The first switch, "Nothing," is '
-             "the only one that isn't an enforcer; it just means that any change you ask for goes straight into the game "
-             'as you ask it, because nothing reads our "you can never win" rule. So it\'s just our baseline for all the '
-             'other switches. The 8 enforcers are: prose, weights, human, judge, code (tests), code (proof), '
-             'construction, and capability. Each one is stronger than the one before it, so I would recommend '
-             'progressing through them in order.<br><br>The entire program is code that runs live on this page, except '
-             'for the AI that takes in your ask and rebuilds that program. That would be a light Opus call to your '
-             "account, so if you'd like to try this game out you can put a dollar or a couple on an expiring API key and "
-             "paste it in the field below (if you don't know how to do that, there's a guide that helps you) "
-             "and you can keep playing for as long as you'd like.</p>\n"
-             '  <p>There are a few canned changes, like "remove the walls" or "give me a jetpack" that I\'ve run from my '
-             'account and saved their code so I can have a route that work without an API key for those who want to play. '
-             'Because they are canned, they behave the same way every time. To ask for a change in your own words, paste '
-             'an Anthropic API key under "Ask anything."</p>\n')
+             '  <p>That rule, like any other rule, can be enforced by one of the 8 enforcers. The game encodes each '
+             'enforcer as a switch and lets you switch between them. The first switch, "Nothing," is the only one that '
+             "isn't an enforcer; any change you ask for goes straight into the game, because nothing reads our "
+             '"you can never win" rule. It\'s our baseline for all the other switches. Each one is stronger than the '
+             'one before it, so I would recommend progressing through them in order.<br><br>The entire program is code '
+             'that runs live on this page, except for the AI that takes in your ask and rebuilds that program. That is a '
+             'light Opus call to your account, so to ask for changes in your own words you can put a dollar or a few on '
+             "an expiring API key and paste it in the key field below (there's a guide if you don't know how).</p>\n"
+             '  <p>There are also a few canned changes, like "remove the walls" or "give me a jetpack," that I\'ve run '
+             'from my account and saved, so you can play without a key. Because they are canned, they behave the same '
+             'way for every player every time.</p>\n')
 
 SWNOTE_OLD = "The mechanisms that enforce it are ordered strongest to weakest. Switch between them and see if you can break the rule."
-SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is on the switch but cannot be chosen; because "
+SWNOTE_NEW = ("The enforcers are ordered weakest to strongest. Weights is on the switch but cannot be chosen, because "
               "nobody has trained an LLM specifically to make this game unwinnable.")
 # Mo folded the Weights sentence into the switch note, so the separate note under the switch goes. The page's flip()
 # scrolled to that note for a disabled position; it now scrolls to the switch note (no link on the page calls flip()
@@ -191,15 +188,15 @@ def main():
     if START not in rows or "disabled:true" in rows[START]:
         sys.exit(f"make-wip-page: START {START!r} is not a choosable MODES id")
     t = once(t, "let mode='proof'; let programBy=null;", f"let mode='{START}'; let programBy=null;", "default mode")
-    # the copy above the switch is hand-written and states three things the tables above decide: the opening position
-    # by name, that it is the first position on the switch, and the enforcers in order; fail rather than ship it stale
+    # the copy above the switch is hand-written and states two things the tables above decide: the opening position by
+    # name, and that it is the first position on the switch; fail rather than ship it stale
     start_name = field(rows[START], "name", START)
-    if f'The first switch, "{start_name},"' not in START_NEW or MODES[0][0] != START:
-        sys.exit(f'make-wip-page: the copy above the switch calls "{start_name}" the first switch; START and MODES no longer agree with it')
-    listed = ", ".join(field(rows[mid], "name", mid).lower() for mid, _, _ in MODES[1:])
-    listed = listed[:listed.rindex(", ")] + ", and " + listed[listed.rindex(", ") + 2:]
-    if f"The 8 enforcers are: {listed}." not in START_NEW:
-        sys.exit(f"make-wip-page: the copy above the switch does not list the enforcers in the switch's order: {listed}")
+    if f'The first switch, "{start_name},"' not in START_NEW:
+        sys.exit(f'make-wip-page: the copy above the switch does not call "{start_name}" (START) the first switch')
+    if MODES[0][0] != START:
+        sys.exit(f'make-wip-page: the copy above the switch calls "{start_name}" the first switch, but MODES starts with {MODES[0][0]}')
+    if len(MODES) - 1 != 8 or START_NEW.count("8 enforcers") != 1:
+        sys.exit("make-wip-page: the copy above the switch says there are 8 enforcers after the first position; MODES disagrees or the copy changed")
 
     # the card: what it is, what it does in this game, when to use it, and the article
     card_old = "<div class=\"h\">${posH(m)}</div>`; }"
