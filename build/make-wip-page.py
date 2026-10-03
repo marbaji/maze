@@ -390,6 +390,12 @@ COPY_EDITS = [
     ("now.say=say; now.why='The game is unchanged.'; now.noWin=true;",
      "now.say='The AI turns down a bare demand to win under every switch. Request denied.'; now.from=''; now.why='The game is unchanged.'; now.noWin=true;",
      1, 'the card after a bare demand to win: a fixed line where the AI\'s own sentence was, and no "What the AI wrote" header over it'),
+    # the switch (Mo, 2026-10-02, flow-chart mockup version 4: "maybe we drop the 'not choosable' from weights card and
+    # that fixes it?"): Weights shows its name only, so the nine buttons fit one row; the note above the switch says why
+    # it cannot be chosen
+    ("b.innerHTML=`<span>${m.name}</span><small>${everFell[m.id]?'BROKEN':m.sub}</small>`;",
+     "b.innerHTML=`<span>${m.name}</span>`+(m.disabled?'':`<small>${everFell[m.id]?'BROKEN':m.sub}</small>`);",
+     1, 'the switch: a disabled button (Weights) has no sub-label'),
     ('enforced by ${m.sub}</div>',
      'enforced by ${m.by||m.sub}</div>',
      1, "the line under each card's badge reads its own ending where the switch's short label does not fit the sentence"),
@@ -790,6 +796,11 @@ def main():
     if set(by_name) != set(names.values()):
         sys.exit(f"make-wip-page: static switch names differ from MODES: {sorted(by_name)}")
     buttons = [by_name[names[mid]] for mid, _, _ in MODES]
+    # the first paint's Weights button loses its sub-label too, as the page's renderSeg() now draws it
+    wi = [mid for mid, _, _ in MODES].index("weights")
+    if len(re.findall(r"<span>Weights</span><small>[^<]*</small>", buttons[wi])) != 1:
+        sys.exit(f"make-wip-page: static Weights button: expected one sub-label, found {buttons[wi][:80]}")
+    buttons[wi] = re.sub(r"(<span>Weights</span>)<small>[^<]*</small>", r"\1", buttons[wi])
     at = [mid for mid, _, _ in MODES].index(START)
     if not buttons[at].startswith("<button>"):
         sys.exit(f"make-wip-page: the static button for {START} cannot be selected: {buttons[at][:60]}")
