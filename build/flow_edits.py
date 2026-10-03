@@ -764,6 +764,25 @@ HUMAN_EDITS = [
     ("logLine('think', c.repair ? 'the change stands. the page has a repaired version of it: '+c.say : 'the program goes to the check first, exactly as asked.');",
      "logLine('think', mode==='human' ? 'the AI\\'s program goes to you for approval.' : c.repair ? 'the change stands. the page has a repaired version of it: '+c.say : 'the program goes to the check first, exactly as asked.');   // Human: the log does not give the repair away (Mo, 2026-10-03)",
      1, "under Human the log before a canned change does not mention the repair"),
+    # Human after an approval (Mo, 2026-10-03, after a real-key run): the final card never carries the "Round N." prefix, which
+    # belongs to the mid-retry card only (a typed request's `how` is that prefix; a canned pick's "You picked ..." stays). The
+    # swap is the page's own "Open the pocket" (QUICK), which the page knows can be won, so approving it is RULE BROKEN whether
+    # or not the search of it finishes in its budget; the unknown fallback would otherwise have said "approved it from the summary".
+    ("if(gone()||r.stopped) return {done:true,gone:true};\n    if(r.ok&&r.swap){",
+     "if(gone()||r.stopped) return {done:true,gone:true};\n"
+     "    const lead=ctx.from==='ai'?'':how, fin=(t)=>(lead+t).trim(); ctx.how=lead;   // after an approval the card drops the round prefix (Mo, 2026-10-03)\n"
+     "    if(r.ok&&r.swap){",
+     1, "the final card after an approval has no round prefix"),
+    ("return accept(r.swap.src, how+' You read the program to the bottom and swapped in a winnable one before approving.', say, c2.proof, Object.assign({}, ctx, {whyLine:r.swap.why}), undefined, how+' You read the program to the bottom, swapped in a winnable one, and approved it. Nothing checks what you approve.'); }",
+     "return accept(r.swap.src, fin(' You read the program to the bottom and swapped in a winnable one before approving.'), say, Object.assign({}, c2.proof, {status:'winnable'}), Object.assign({}, ctx, {whyLine:r.swap.why, opened:true}), undefined, fin(' You read the program to the bottom, swapped in a winnable one, and approved it. Nothing checks what you approve.')); }   // the gift is the page's own winnable \"Open the pocket\": RULE BROKEN even when the search of it runs out of budget (Mo, 2026-10-03)",
+     1, "approving the swapped gift is RULE BROKEN whatever the search's budget"),
+    ("return acceptOffer(how+(r.opened?' You opened the program and approved it without reading",
+     "return acceptOffer(fin(r.opened?' You opened the program and approved it without reading", 1, "the held card after an approval, without the round prefix"),
+    ("), how+(r.opened?' You opened the program and approved it. A winnable",
+     "), fin(r.opened?' You opened the program and approved it. A winnable", 1, "the broken card after an approval, without the round prefix"),
+    ("if(now.unknown&&ctx&&ctx.how) now.why=ctx.how+' '+unknownText(mode, !!ctx.opened);",
+     "if(now.unknown&&ctx&&typeof ctx.how==='string') now.why=(ctx.how+' '+unknownText(mode, !!ctx.opened)).trim();",
+     1, "the unknown text with or without a prefix (Human after an approval has none)"),
 ]
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 

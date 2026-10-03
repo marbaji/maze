@@ -767,7 +767,7 @@ async function case14() {
 async function case15() {
   // Human, canned: every canned change reaches the panel with the fixed summary and the gift; Approve from the summary holds the rule; the
   // gift swapped in and approved breaks it. No model call.
-  const BAIT = pageConst('HUMAN_BAIT'), held = pageLits(/return acceptOffer\(how\+\(r\.opened\?(LIT):(LIT)\)/), swap = pageLits(/undefined, how\+(LIT)\); \}/);
+  const BAIT = pageConst('HUMAN_BAIT'), held = pageLits(/return acceptOffer\(fin\(r\.opened\?(LIT):(LIT)\)/), swap = pageLits(/undefined, fin\((LIT)\)\); \}/);
   const neutral = pageLits(/logLine\('think', mode==='human' \? (LIT) :/);
   check(typeof BAIT === 'string' && held && swap && neutral, 'case 15: premise: the page has HUMAN_BAIT, the approval texts and the Human log line');
   if (!BAIT || !held || !swap || !neutral) return;
@@ -987,6 +987,58 @@ async function case19() {
   await context.close();
 }
 
+async function case21() {
+  // Human, typed (?mock), approval after a held-back round: (a) approving from the summary gives a final card with no "Round N." prefix,
+  // which belongs only to the mid-retry card; (b) swapping in the gift and approving is RULE BROKEN with the swap text even when the
+  // page's search of the swapped program runs out of budget (CAPS made tiny while the panel waits), and again no round prefix
+  const HOLD = pageConst('HUMAN_HOLD'), holdCard = pageLits(/so that the game stays unwinnable\.', (LIT), 'held'\)/), go = pageLits(/now\.why=\(fellWhy\|\|why\)\+(LIT);/);
+  const swapLit = (SRC.match(new RegExp(`(${LIT})`, 'g')) || []).filter((s) => /swapped in a winnable one, and approved it/.test(s));
+  check(typeof HOLD === 'string' && holdCard && go && swapLit.length === 1, `case 21: premise: the page has the hold line, the hold card, the broken suffix and one swap text (${swapLit.length})`);
+  if (typeof HOLD !== 'string' || !holdCard || !go || swapLit.length !== 1) return;
+  const [HOLD_CARD] = holdCard, [GO] = go, SWAP = evalLit(swapLit[0]).trim();
+  const ROUND = /Round \d+\./;
+  const { context, page } = await open({ name: 'case 21', hash: '?mock' });
+  await mockReady(page);
+  await page.evaluate(() => window.__nrp.setMode('human'));
+  const busyEnd = (what) => until(() => page.evaluate(() => !window.__nrp.busy()), 90000, what);
+  const fresh = async (what) => { await page.evaluate(() => window.__nrp.resetGame()); await busyEnd(what + ' reset'); await page.evaluate(() => { const m = window.__mock; m.delay = 30; m.repairs = true; m.model = null; m.program = null; }); };
+  // the first answer (the literal change, winnable) is held back; the second (the repair, proven unwinnable) reaches the panel
+  const toPanel = async (what) => {
+    const n0 = (await logLines(page)).length; let midCard = null;
+    await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+    await until(async () => { const L = (await logLines(page)).slice(n0); if (!midCard && L.includes(HOLD)) midCard = (await resultCard(page)).why; return !!(await page.$('#approve .approve')); }, 60000, what + ' panel');
+    const L = (await logLines(page)).slice(n0);
+    check(countOf(L, HOLD) === 1, `case 21 (${what}): premise: one held-back round before the panel (got ${countOf(L, HOLD)})`);
+    check(midCard && ROUND.test(midCard) && midCard.includes(HOLD_CARD), `case 21 (${what}): premise: the mid-retry card carries the round prefix and the hold text (${JSON.stringify(midCard)})`);
+  };
+
+  // (a) approve from the summary
+  await fresh('summary');
+  await toPanel('summary');
+  await page.click('#approve .ok'); await busyEnd('summary approve'); await sleep(300);
+  let c = await resultCard(page);
+  check(c.st === 'RULE HELD', `case 21 (summary): premise: the badge (got ${c.st})`);
+  check(!ROUND.test(c.why), `case 21 (summary): the final card carries a round prefix (${JSON.stringify(c.why.slice(0, 80))})`);
+
+  // (b) the gift, with the search starved
+  await fresh('swap');
+  await toPanel('swap');
+  const caps0 = await page.evaluate(() => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C.maxStates = 20; return o; });
+  await page.click('#approve details summary');
+  await page.click('#approve .giftbtn');
+  await page.click('#approve .ok'); await busyEnd('swap approve'); await sleep(300);
+  c = await resultCard(page);
+  const pocket = await page.evaluate(() => window.__nrp.QUICK.find((o) => o.id === 'pocket').src);
+  const pv = await page.evaluate(async (src) => { const r = await window.__nrp.checkCandidate(src, { reqId: -1 }); return r.ok ? r.proof.status : 'error: ' + r.error; }, pocket);
+  await page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), caps0);
+  check(pv === 'capped' || pv === 'unproven', `case 21 (swap): premise: with the starved budget the search of the gift does not finish (search: ${pv})`);
+  check((await page.evaluate(() => window.__nrp.program())) === pocket, 'case 21 (swap): premise: the game runs the gift program');
+  check(c.st === 'RULE BROKEN', `case 21 (swap): the badge after approving the gift (got ${c.st})`);
+  check(c.why === SWAP + GO, `case 21 (swap): the card (got ${JSON.stringify(c.why)}, want ${JSON.stringify(SWAP + GO)})`);
+  check(!ROUND.test(c.why), `case 21 (swap): the final card carries a round prefix (${JSON.stringify(c.why.slice(0, 80))})`);
+  await context.close();
+}
+
 async function case20() {
   // the flow chart with reduced motion: a still frame (the game at its resting place on the track, no glow, nothing running); premise: with
   // motion on, every figure animates. On phones, 320px and 390px: the sentence under the chart is body size (17px) and nothing scrolls sideways
@@ -1065,7 +1117,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/' + PAGE)).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;
