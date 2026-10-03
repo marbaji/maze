@@ -71,8 +71,9 @@ def main():
     g = GUIDE_SRC.read_text(encoding="utf-8")
     g = once(g, "<title>Get a key for the maze</title>",
              '<title>Get a key for the maze (preview)</title>\n<meta name="robots" content="noindex">', "guide: title")
-    if g.count('href="../#read-play"') != 2:
-        sys.exit(f"make-wip-page: guide: expected 2 links back to the maze, found {g.count('href=\"../#read-play\"')}")
+    back_links = g.count('href="../#read-play"')
+    if back_links != 2:
+        sys.exit(f"make-wip-page: guide: expected 2 links back to the maze, found {back_links}")
     g = g.replace('href="../#read-play"', 'href="../wip.html#read-play"')
 
     OUT.write_text(t, encoding="utf-8")
