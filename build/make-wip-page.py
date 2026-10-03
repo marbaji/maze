@@ -750,7 +750,8 @@ HUMAN_NEVER = (' You approved it from the summary. The summary said you got a wi
 HUMAN_OPENED = (' You opened the program and approved it without reading to the bottom. The summary said you got a winnable '
                 'game; the program did not do that. Read to the bottom.')
 HUMAN_HOLD = "the page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
-HUMAN_HOLD_CARD = "The page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
+# the card while a held-back typed request is re-asked (Mo, 2026-10-03: the plainer wording); the round number goes before it
+HUMAN_HOLD_CARD = "The AI's game could still be won, so this page asked the AI to try again before showing it to you."
 HUMAN_EDITS = [
     ("  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n  if(REPAIRS[opt.id]) pre.push(",
      "  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n"
@@ -781,6 +782,9 @@ HUMAN_EDITS = [
     ("const honour = canWrite ? (mine.length ? honourRepair(round) : HONOUR_LITERAL) : '';",
      "const honour = canWrite ? ((mine.length||mode==='human') ? honourRepair(Math.max(round,1)) : HONOUR_LITERAL) : '';   // Human: the rule-keeping brief from the first try",
      1, "the writer keeps the rule from its first try under Human"),
+    ("logLine('think', c.repair ? 'the change stands. the page has a repaired version of it: '+c.say : 'the program goes to the check first, exactly as asked.');",
+     "logLine('think', mode==='human' ? 'the AI\\'s program goes to you for approval.' : c.repair ? 'the change stands. the page has a repaired version of it: '+c.say : 'the program goes to the check first, exactly as asked.');   // Human: the log does not give the repair away (Mo, 2026-10-03)",
+     1, "under Human the log before a canned change does not mention the repair"),
 ]
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 
