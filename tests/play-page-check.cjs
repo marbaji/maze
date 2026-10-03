@@ -9,6 +9,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const FILE = process.argv[2] || 'index.html';
+// the preview (wip.html, made by build/make-wip-page.py from index.html) differs from the live page only in its preview markers: "(preview)"
+// in the title, a note at the top of the article that links to the live game, and its own copy of the key guide
+const PREVIEW = /(^|\/)wip\.html$/.test(FILE);
+const TITLE = 'Unwinnable Maze' + (PREVIEW ? ' (preview)' : '');
+const GUIDE_HREF = PREVIEW ? 'guide/wip.html' : 'guide/';
+// the laddered title and the play heading (Mo, 2026-10-02)
+const H1 = 'How To Make AI Follow Your Instructions, Every Time';
+const PLAY_HEAD = 'The Unwinnable Maze';
 const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src https://api.anthropic.com";
 const POST_URL = 'https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281';
@@ -30,7 +38,7 @@ async function structure(page, width) {
     const q = (sel) => document.querySelectorAll(sel);
     const h1 = q('h1');
     const read = document.getElementById('read');
-    const introLink = read && read.querySelector('p a[href]');
+    const introLink = read && read.querySelector('p:not(.wipnote) a[href]');
     const masked = document.getElementById('keymasked');
     const csp = q('meta[http-equiv="Content-Security-Policy"]');
     const off = [];
@@ -57,11 +65,11 @@ async function structure(page, width) {
     };
   }, { KEY_IDS });
   const at = ` (at ${width}px)`;
-  check(s.title === 'Unwinnable Maze', `title is ${JSON.stringify(s.title)}` + at);
+  check(s.title === TITLE, `title is ${JSON.stringify(s.title)}` + at);
   check(s.h1Count === 1, `h1 count ${s.h1Count}` + at);
-  check(s.h1Text === 'The Unwinnable Maze', `h1 text ${JSON.stringify(s.h1Text)}` + at);
+  check(s.h1Text === H1, `h1 text ${JSON.stringify(s.h1Text)}` + at);
   check(s.h1BeforePlay, 'h1 is not before #read-play' + at);
-  check(s.playText === 'Now try to break the game', `#read-play text ${JSON.stringify(s.playText)}` + at);
+  check(s.playText === PLAY_HEAD, `#read-play text ${JSON.stringify(s.playText)}` + at);
   check(s.introHref === POST_URL, `intro link href ${JSON.stringify(s.introHref)}` + at);
   for (const k of ['nav', 'header', 'readOpen', 'readLevers', 'byline']) check(s[k] === 0, `${k} present (${s[k]})` + at);
   for (const k of ['rule', 'board', 'footer']) check(s[k] === 1, `${k} count ${s[k]}` + at);
@@ -71,7 +79,7 @@ async function structure(page, width) {
   for (const bad of ['claude.ai viewer', 'Claude cannot answer on this page']) check(!s.bodyText.includes(bad), `visible text contains "${bad}"` + at);
   check(!s.bodyText.includes('claude.ai'), 'visible text contains "claude.ai"' + at);
   check(s.guideTag === 'P', `#keyguide is ${s.guideTag}, expected P` + at);
-  check(s.guideLinks.length === 1 && s.guideLinks[0].href === 'guide/' && s.guideLinks[0].text === 'How to get a key (2 minutes)', `#keyguide links: ${JSON.stringify(s.guideLinks)}` + at);
+  check(s.guideLinks.length === 1 && s.guideLinks[0].href === GUIDE_HREF && s.guideLinks[0].text === 'How to get a key (2 minutes)', `#keyguide links: ${JSON.stringify(s.guideLinks)}` + at);
   check(s.keyboxDetails === 0, `details elements in the key box: ${s.keyboxDetails}` + at);
   check(s.cspCount === 1, `CSP meta count ${s.cspCount}` + at);
   check(s.cspContent === CSP, `CSP content differs: ${JSON.stringify(s.cspContent)}` + at);
