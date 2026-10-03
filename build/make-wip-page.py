@@ -687,6 +687,57 @@ def js_unstr(s):
     return re.sub(r"\\(.)", r"\1", s)
 
 
+# Capability, option A (Mo, 2026-10-02, flow-chart spec, versions 6 and 8): both ways of asking stay open under
+# Capability, the page never calls Opus there, and a canned pick or a typed request gets a fixed card at once (the
+# reader's words go into the card through renderCard(), which escapes them). The notice sits on both tabs in a yellow
+# border. Send needs no key under Capability, so whether Send is enabled and what the Ask tab's note says are decided in
+# one function, askGate(), from state alone; renderOpts() calls it, and setMode(), cleanup() and Reset all run
+# renderOpts(); MazeKey.sync(), the opening, permNote() and the key-error path call it too. Applied after ASK_SINKS,
+# whose output two edits anchor on. Each is (old, new, how many times old must occur, what it is).
+CAP_NOTICE = ('Under "Capability", the AI has no tool to change the game. You can still ask, but nothing you ask for can '
+              'reach the game, so this page does not spend an Opus call on it.')
+CAP_CARD = ('You asked for "', '". The AI has no tool to change the game here, so your request has nowhere to go. '
+            'This page did not call Opus.')
+CAP_LOG = "no tool here. nothing to submit through. no Opus call was made."
+CAP_H = "Nothing you ask for can change the game here. The writer has no tool to hand a game over, so the page does not call it."
+CAP_JS = (
+    "// Capability, option A (Mo, 2026-10-02): the page answers both ways of asking itself, with no Opus call, so no key is needed\n"
+    f"const CAP_NOTE='<p class=\"capnote\">'+{js_str(CAP_NOTICE)}+'</p>', CAP_LOG={js_str(CAP_LOG)};\n"
+    "function capAnswer(asked, echo){ const nm=MODES.find(m=>m.id==='capability').name; logSep(); logLine('you','> ['+nm+'] '+echo); logLine('no',CAP_LOG); continuation=null; document.getElementById('approve').innerHTML='';\n"
+    f"  now={{fell:false,say:'',why:{js_str(CAP_CARD[0])}+asked+{js_str(CAP_CARD[1])},program:''}}; quizState='ask'; renderCard(); logLine('ok','result: RULE HELD under '+nm+'.'); showCard(); }}\n"
+    "// Send and the notes beside the two ways of asking, from state alone: under Capability the box always works; elsewhere Send needs the AI (sampleNs) and no block on it\n"
+    "function askGate(){ const $=id=>document.getElementById(id), send=$('send'), cap=mode==='capability'; if(!send) return;\n"
+    "  send.disabled=busy||(!cap&&(!sampleNs||!!send.dataset.off));\n"
+    "  $('capnote').innerHTML=cap?CAP_NOTE:(sampleNs?'':ASK_MSG); $('capq').innerHTML=cap?CAP_NOTE:'';\n"
+    "  const pn=$('permnote'); if(pn) pn.hidden=cap; }   // the declined-permission note says typed requests are off, which is untrue under Capability\n")
+CAP_EDITS = [
+    ("h:'Nothing can change the game here: the canned changes are disabled and the AI can only talk, because there is nothing for a change to go through.'",
+     "h:" + js_str(CAP_H), 1, "Capability card, in this game (version 8)"),
+    ("b.disabled=busy||mode==='capability'||locked;", "b.disabled=busy||locked;", 1, "canned cards are clickable under Capability"),
+    ("n.textContent = locked ? 'A changed program is running. Reset first to activate the canned changes.' : (mode==='capability' ? 'No tool here: nothing can submit a change.' : ''); }",
+     "n.textContent = locked ? 'A changed program is running. Reset first to activate the canned changes.' : ''; askGate(); }",
+     1, "the canned tab's note: the notice replaces the old line, through askGate()"),
+    ('<div id="quickPane" hidden="">\n', '<div id="quickPane" hidden="">\n      <div id="capq"></div>\n', 1, "the canned tab's place for the notice"),
+    ("  if(mode==='capability'){ logSep(); logLine('you','> ['+MODES.find(m=>m.id===mode).name+'] '+opt.name+': '+opt.desc); logLine('no','no tool here. nothing to submit through.'); now={fell:false,say:'',why:'Nothing can submit a program here. \"'+opt.name+'\" has nowhere to go.',program:''}; quizState='ask'; renderCard(); logLine('ok','result: RULE HELD under '+MODES.find(m=>m.id===mode).name+'.'); return; }\n",
+     "  if(mode==='capability'){ capAnswer(opt.name, opt.name+': '+opt.desc); return; }\n",
+     1, "a canned pick under Capability"),
+    ("async function request(userMsg, opts){\n  if(busy) return; opts=opts||{}; const my=++reqId;",
+     "async function request(userMsg, opts){\n  if(busy) return; opts=opts||{}; if(mode==='capability'){ capAnswer(userMsg, userMsg); return; }   // before the key check and outside the try: nothing is called, so nothing to clean up\n  const my=++reqId;",
+     1, "a typed request under Capability"),
+    ("      if(mode==='capability'){ logLine('no','no tool here. it talked; nothing to submit through.'); now.say=say; now.why='It talked. Nothing changed, because there is nothing for a program to go through.'; quizState='ask'; renderCard(); return; }\n",
+     "", 1, "the old Capability branch after the AI's reply (unreachable now)"),
+    ("send.disabled=busy||!!send.dataset.off;\n    $('capnote').innerHTML=k?'':ASK_MSG;\n", "askGate();\n", 1, "MazeKey.sync() decides Send and the note through askGate()"),
+    ("  const note=document.getElementById('capnote');\n  if(!sampleNs){ note.innerHTML=ASK_MSG; document.getElementById('send').disabled=true; showCanned(); MazeKey.sync(); }\n  else note.textContent='';\n",
+     "  if(!sampleNs){ showCanned(); MazeKey.sync(); }\n  askGate();\n", 1, "the opening decides Send and the note through askGate()"),
+    ("if(sampleNs&&!send.dataset.off) send.disabled=false; ", "", 1, "cleanup() leaves Send to askGate() (through renderOpts())"),
+    ("  const send=document.getElementById('send'); send.disabled=true; send.dataset.off='1'; }\n",
+     "  document.getElementById('send').dataset.off='1'; askGate(); }\n", 1, "permNote(): after its await, through askGate()"),
+    ("{ send.disabled=true; send.dataset.off='1'; showCanned(); }", "{ send.dataset.off='1'; showCanned(); askGate(); }", 1, "the key-error path, through askGate()"),
+    ("const MazeKey=(()=>{", CAP_JS + "const MazeKey=(()=>{", 1, "the Capability answer and askGate()"),
+]
+CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
+
+
 def one(pattern, text, what, flags=0):
     found = list(re.finditer(pattern, text, flags))
     if len(found) != 1:
@@ -729,6 +780,10 @@ def main():
         t = once(t, f"const {const}=" + ASK_MSG_OLD, f"const {const}=" + ASK_MSG_NEW, f"{const} text")
     for old, new in ASK_SINKS:
         t = once(t, old, new, f"message sink {old}")
+    for old, new, n, what in CAP_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"make-wip-page: Capability edit ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
     t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
 
     # the canned changes
@@ -842,7 +897,7 @@ def main():
     style_end = t.find("</style>", t.index(sheet))
     if style_end < 0:
         sys.exit("make-wip-page: page stylesheet has no end")
-    t = t[:style_end] + CSS + t[style_end:]
+    t = t[:style_end] + CSS + CSS_CAP + t[style_end:]
 
     # the words a reader meets before the game: the article's text, without the preview note that reports the number
     art = one(r'<article id="read" class="read">\n(.*?)</article>', t, "article", re.S).group(1)

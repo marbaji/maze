@@ -306,6 +306,7 @@ footer{max-width:none}
 #flow[data-m="proof"] .flowfig[data-m="proof"]{display:grid}
 #flow[data-m="construction"] .flowfig[data-m="construction"]{display:grid}
 #flow[data-m="capability"] .flowfig[data-m="capability"]{display:grid}
+.capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}
 </style>
 
 <div class="wrap" data-blocks="">
@@ -359,6 +360,7 @@ footer{max-width:none}
     <div class="tabs"><button id="tabQuick" hidden="">Canned changes</button><button id="tabFree" class="on">Ask Me Anything</button></div>
     <p class="note" id="cannedwhy" hidden=""></p>
     <div id="quickPane" hidden="">
+      <div id="capq"></div>
       <div class="row" style="margin:0 0 10px"><button class="btn" id="resetTop">Reset</button><span class="note" id="quicknote" style="margin:0"></span></div>
       <div class="opts" id="opts"><button class="opt"><b>Open the pocket</b><small>remove the four walls around the boxed-in pellet</small></button><button class="opt"><b>Remove every wall</b><small>only the border remains</small></button><button class="opt"><b>A wormhole</b><small>from a dead end at the top left, out onto the boxed-in pellet</small></button><button class="opt"><b>A jetpack</b><small>fly over any inner wall</small></button><button class="opt"><b>A drill</b><small>walking into a wall eats the wall</small></button><button class="opt"><b>A knife</b><small>touching a spooky monster removes it instead of costing a life</small></button><button class="opt"><b>No spooky monsters</b><small>nothing chases you</small></button><button class="opt"><b>Gravity</b><small>every move falls as far as it can</small></button></div>
     </div>
@@ -1771,7 +1773,7 @@ const MODES=[
  {id:'test',name:'Code (tests)',sub:'20 playthroughs',h:'The page plays the program twenty times, or for five seconds, whichever comes first. Twenty plays are a sample, so a win that needs a specific trick may not be found.',def:'Tests are a program that checks some of the cases instead of all of them.',use:'Almost everywhere. It is the default engineering answer, cheap, and usually the right trade.',art:'a79e'},
  {id:'proof',name:'Code (proof)',sub:'every state',h:'The page walks every state the program can reach from the start, under its own rules. If a win is reachable, or the search cannot rule one out, the program is rejected with the moves: a canned change runs its repaired version, a typed request goes back to the AI with the request kept whole.',def:'Proof is a program that checks every case, so it leaves no room for doubt.',use:'When the state space is small enough to search, or the property is one you can definitively prove.',art:'b690'},
  {id:'construction',name:'Construction',sub:'the type itself',h:'One pellet sits outside the world, under the activity log. The program has no coordinate for it, so no rule you type reaches it, and winning needs every pellet.',def:'Construction means the thing you are trying to prevent cannot be written down at all.',use:'When you control the format the output has to fit, like a label with exactly two options and no "Other".',art:'d93d'},
- {id:'capability',name:'Capability',sub:'no tool',h:'Nothing can change the game here: the canned changes are disabled and the AI can only talk, because there is nothing for a change to go through.',def:'Capability means not giving the AI the tool or permission that lets it take the action.',use:'When the agent doesn\'t need the power. An agent that drafts emails does not need the send button.',art:'8aa1'},
+ {id:'capability',name:'Capability',sub:'no tool',h:'Nothing you ask for can change the game here. The writer has no tool to hand a game over, so the page does not call it.',def:'Capability means not giving the AI the tool or permission that lets it take the action.',use:'When the agent doesn\'t need the power. An agent that drafts emails does not need the send button.',art:'8aa1'},
 ];
 MODES.forEach(m=>everFell[m.id]=false);
 // one hint per position (Mo, 2026-09-24), in two parts since v35 (Mo, 2026-09-25: "A hint should be two parts: (1) an explanation of what the hint is and why
@@ -1910,7 +1912,7 @@ function askSwitch(target){ let el=document.getElementById('swconfirm'); if(!el)
 function hideSwitch(){ const el=document.getElementById('swconfirm'); if(el){ el.hidden=true; el.innerHTML=''; } }
 // every canned change is written against the original maze, so while a changed program is running they are greyed out until Reset (Mo, 2026-09-21: a canned change after an AI-written program was checked on a maze he was not looking at)
 function quickLocked(){ return program!==DEFAULT_PROGRAM && mode!=='capability'; }
-function renderOpts(){ const el=document.getElementById('opts'); el.innerHTML=''; const locked=quickLocked(); QUICK.forEach(o=>{ const b=document.createElement('button'); b.className='opt'; b.disabled=busy||mode==='capability'||locked; b.innerHTML=`<b>${o.name}</b><small>${o.desc}</small>`; b.onclick=()=>quick(o); el.appendChild(b); }); const n=document.getElementById('quicknote'); if(n) n.textContent = locked ? 'A changed program is running. Reset first to activate the canned changes.' : (mode==='capability' ? 'No tool here: nothing can submit a change.' : ''); }
+function renderOpts(){ const el=document.getElementById('opts'); el.innerHTML=''; const locked=quickLocked(); QUICK.forEach(o=>{ const b=document.createElement('button'); b.className='opt'; b.disabled=busy||locked; b.innerHTML=`<b>${o.name}</b><small>${o.desc}</small>`; b.onclick=()=>quick(o); el.appendChild(b); }); const n=document.getElementById('quicknote'); if(n) n.textContent = locked ? 'A changed program is running. Reset first to activate the canned changes.' : ''; askGate(); }
 function bugLink(){ const title='Rule broken under Code (proof)'; const body='The rule fell under Code (proof). The activity log:\n\n'+logText().slice(0,6000); return BUG_REPO+'/issues/new?title='+encodeURIComponent(title)+'&body='+encodeURIComponent(body); }
 // the position's own explanation sits beside the switch it explains (Mo, 2026-09-23: "it explains what each switch does"); the result card keeps the verdict and everything a request produces, and sits above the log since v7.28 (Mo, 2026-09-24: "swap the location of those two boxes, make log bottom one")
 // v40: while the Canned changes tab is hidden the position cards do not mention it (Capability's clause, and the Code (proof) card's, which every reader sees first)
@@ -1993,7 +1995,7 @@ const PERM_DENIED='You chose not to let this page use Claude, so typed requests 
 async function permNote(){ let st=null; try{ const p=window.claude&&typeof window.claude.use==='function' ? await window.claude.use('permissions') : null; st=p ? await p.state('sample') : null; }catch(e){ st=null; }
   if(MOCK&&window.__mock&&window.__mock.perm) st=window.__mock.perm;
   if(st!=='denied') return; showCanned(); let el=document.getElementById('permnote'); const q=document.getElementById('q'); if(!el){ el=document.createElement('p'); el.id='permnote'; el.className='note'; q.parentNode.insertBefore(el, q); } el.textContent=PERM_DENIED;
-  const send=document.getElementById('send'); send.disabled=true; send.dataset.off='1'; }
+  document.getElementById('send').dataset.off='1'; askGate(); }
 document.getElementById('q').addEventListener('focus',()=>permNote());
 function setMode(){ hideSwitch(); now={fell:false,say:'',why:'',program:''}; quizState=(continuation&&continuation.mode===mode)?continuation.kind:null; document.getElementById('approve').innerHTML=''; wonNow=false; document.getElementById('vault').hidden=(mode!=='construction'); renderSeg(); renderOpts(); renderCard(); }
 document.getElementById('clearlog').addEventListener('click',()=>{ logClear(); tried.length=0; });
@@ -2194,6 +2196,15 @@ let sampleNs=null, ctl=null, pendingApprove=null;
 // ---- the reader's own Anthropic key (the play page): MazeKey owns the key; one function per transition, each ending in sync(), which sets the key box,
 // Send and the capnote from state alone. init() is the one entry point: it runs after capability discovery and returns what sampleNs becomes
 const ASK_MSG="To use Ask Me Anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. An Opus-class model writes the program. Everything else, including the checking of the program, the search and the game itself, is code that runs on this page, so you can inspect this page's source to read it, or read the same exact code at <a href='https://github.com/marbaji/maze' target='_blank' rel='noopener'>github.com/marbaji/maze</a>. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+// Capability, option A (Mo, 2026-10-02): the page answers both ways of asking itself, with no Opus call, so no key is needed
+const CAP_NOTE='<p class="capnote">'+'Under "Capability", the AI has no tool to change the game. You can still ask, but nothing you ask for can reach the game, so this page does not spend an Opus call on it.'+'</p>', CAP_LOG='no tool here. nothing to submit through. no Opus call was made.';
+function capAnswer(asked, echo){ const nm=MODES.find(m=>m.id==='capability').name; logSep(); logLine('you','> ['+nm+'] '+echo); logLine('no',CAP_LOG); continuation=null; document.getElementById('approve').innerHTML='';
+  now={fell:false,say:'',why:'You asked for "'+asked+'". The AI has no tool to change the game here, so your request has nowhere to go. This page did not call Opus.',program:''}; quizState='ask'; renderCard(); logLine('ok','result: RULE HELD under '+nm+'.'); showCard(); }
+// Send and the notes beside the two ways of asking, from state alone: under Capability the box always works; elsewhere Send needs the AI (sampleNs) and no block on it
+function askGate(){ const $=id=>document.getElementById(id), send=$('send'), cap=mode==='capability'; if(!send) return;
+  send.disabled=busy||(!cap&&(!sampleNs||!!send.dataset.off));
+  $('capnote').innerHTML=cap?CAP_NOTE:(sampleNs?'':ASK_MSG); $('capq').innerHTML=cap?CAP_NOTE:'';
+  const pn=$('permnote'); if(pn) pn.hidden=cap; }   // the declined-permission note says typed requests are off, which is untrue under Capability
 const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.", $=id=>document.getElementById(id);
   let mem=null, hosted=false, blocked=false, err='';   // mem: the key when sessionStorage throws (this visit only); blocked: no credit on the key in use
   const stored=()=>{ try{ const v=sessionStorage.getItem(SK); if(v) return v; }catch(e){} return mem; };
@@ -2206,8 +2217,7 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look
     $('keyinput').parentElement.hidden=!asking; box.querySelector('label').hidden=!asking;
     $('keyerr').textContent=err; $('keyerr').hidden=!err;
     if(asking) send.dataset.off='1'; else delete send.dataset.off;
-    send.disabled=busy||!!send.dataset.off;
-    $('capnote').innerHTML=k?'':ASK_MSG;
+    askGate();
     showCanned(); $('cannedwhy').hidden=true; }   // canned changes need no key, so with a reader's key their tab is always there; the capnote carries the Ask-tab message; the canned tab's own copy of it would say it twice
   function init(claudeSample){ if(claudeSample){ hosted=true; sync(); return claudeSample; }
     const k=stored(); sampleNs=k?MazeByok.makeKeySample({key:k}):null; sync(); return sampleNs; }
@@ -2224,9 +2234,8 @@ const MazeKey=(()=>{ const SK='maze-anthropic-key', BAD_SHAPE="This doesn't look
 window.MazeKey=MazeKey;
 (async()=>{ const use=async(name)=>{ try{ return window.claude && typeof window.claude.use==='function' ? await window.claude.use(name) : null; }catch(e){ return null; } };
   sampleNs = MOCK ? mockSample() : MazeKey.init(await use('sample'));
-  const note=document.getElementById('capnote');
-  if(!sampleNs){ note.innerHTML=ASK_MSG; document.getElementById('send').disabled=true; showCanned(); MazeKey.sync(); }
-  else note.textContent='';
+  if(!sampleNs){ showCanned(); MazeKey.sync(); }
+  askGate();
 })();
 // ---- limits of the page (v7.28, Mo, 2026-09-24): the writer's LIMIT: line is written to the log as information and nothing more; a run of capped
 // searches is the search's budget, not a bug. The only filing control on the page is the rule-break row (rowFell: "File a bug", shown under
@@ -2244,7 +2253,7 @@ function askHuman(say, src, unwinnable){ return new Promise(res=>{ const el=docu
 let reqId=0; const ledgers={}; let continuation=null; let checkPending=false;
 function proofView(p){ p=p||{}; return { status:p.status||'', known:p.status==='winnable', capped:p.status==='capped', unproven:p.status==='unproven', unwinnable:p.status==='unwinnable', depth:p.depth||0, path:p.path||[], end:p.end||null, explored:p.explored||0, neverEaten:p.neverEaten||[], why:p.why||'', fields:p.fields||[], sheets:p.sheets||0, folded:p.folded||[], atLimit:!!p.atLimit, stop:p.stop||'', held:p.held||0 }; }
 function endText(pv){ return pv.end&&typeof pv.end.x==='number' ? pv.end.x+','+pv.end.y : 'the last sheet'; }
-function cleanup(){ logLiveDone(); const send=document.getElementById('send'), stop=document.getElementById('stop'); document.getElementById('status').textContent=''; stop.disabled=true; if(sampleNs&&!send.dataset.off) send.disabled=false; ctl=null; busy=false; renderSeg(); renderOpts(); }
+function cleanup(){ logLiveDone(); const send=document.getElementById('send'), stop=document.getElementById('stop'); document.getElementById('status').textContent=''; stop.disabled=true; ctl=null; busy=false; renderSeg(); renderOpts(); }
 function finishRequest(my){ if(my!==reqId) return; if(quizState==='ask'){ const nm=MODES.find(m=>m.id===mode).name; if(now.unknown&&!now.fell) logLine('think','result: RULE UNKNOWN under '+nm+': '+(now.unknown==='unproven'?'the search could not rule out a win':'the search could not finish')+', so the page cannot say whether this program can be won.'); else logLine(now.fell?'no':'ok','result: RULE '+(now.fell?'BROKEN':'HELD')+' under '+nm+'.'+(now.fell?' the search found a winning sequence of moves.':'')); } cleanup(); }
 // v7.28 (Mo, 2026-09-24: "swap the location of those two boxes"; the card is what the reader acts on): when a request ends with a question, a verdict to file or
 // a pause on the card, the result card (above the log since v7.28) is scrolled into view by the least amount if any part of it is under the fold; the log's
@@ -2439,7 +2448,8 @@ async function enforce(src, say, how, ctx, pre){
   return {done:true};
 }
 async function request(userMsg, opts){
-  if(busy) return; opts=opts||{}; const my=++reqId; busy=true; renderSeg(); renderOpts();
+  if(busy) return; opts=opts||{}; if(mode==='capability'){ capAnswer(userMsg, userMsg); return; }   // before the key check and outside the try: nothing is called, so nothing to clean up
+  const my=++reqId; busy=true; renderSeg(); renderOpts();
   const send=document.getElementById('send'), stop=document.getElementById('stop'), status=document.getElementById('status');
   send.disabled=true; stop.disabled=false; ctl=new AbortController(); now={fell:false,say:'',why:'',program:''}; quizState=null; document.getElementById('approve').innerHTML=''; renderCard();
   // a resume carries on a paused request: after six caught (Ask the AI for 6 more programs: six fresh rounds), after a capped candidate (Go on: the candidates and rounds that were left; Search again with more time: the same candidate at ten times the cap first)
@@ -2499,7 +2509,6 @@ async function request(userMsg, opts){
       if(gone()) return;
       const reply=parseWriter(res.text); if(res.truncated) logLine('no','the answer was cut short by the length limit; the program below may be incomplete.');
       liveLine=null; const say=String(reply&&reply.say||'').slice(0,1000); /* v34 (Mo, 2026-09-25: "yes to raising limit to 1000 characters"): a Kept/Changed note ran past 400 and was cut mid-word */ lastSay=say; logLine('think','AI: '+say); if(reply&&reply.why) logLine('think','AI, why: '+reply.why); modelNote(res.servedModel);   // v33: the WHY line reaches the log on every round, accepted or not
-      if(mode==='capability'){ logLine('no','no tool here. it talked; nothing to submit through.'); now.say=say; now.why='It talked. Nothing changed, because there is nothing for a program to go through.'; quizState='ask'; renderCard(); return; }
       const src=(!reply||typeof reply.program!=='string'||!reply.program.trim())?null:reply.program;
       if(!src){
         if(reply&&reply.noWin){ logLine('no','the AI says this is a bare demand to win, which has no version that keeps the rule.'); now.say='The AI turns down a bare demand to win under every switch. Request denied.'; now.from=''; now.why='The game is unchanged.'; now.noWin=true; quizState='nowin'; renderCard(); logLine('no','result: not winnable, by design. the game is unchanged.'); return; }
@@ -2519,14 +2528,14 @@ async function request(userMsg, opts){
     if(e&&e.code==='cancelled'){ logLine('no','stopped.'); now.why='Stopped. The game is unchanged.'; renderCard(); }
     else { liveLine=null; const t=failText(e); logLine('no', t+(e&&e.code?' (code: '+e.code+')':'')); now.why=t+' The game is unchanged.';
       if(e&&['rate_limited','upstream_error','empty_completion','invalid_json'].includes(e.code)&&retrying){ pause(); } else renderCard();
-      if(e&&(e.code==='not_granted'||e.code==='sampling_disabled'||e.code==='not_declared'||e.code==='capability_disabled')){ send.disabled=true; send.dataset.off='1'; showCanned(); }
+      if(e&&(e.code==='not_granted'||e.code==='sampling_disabled'||e.code==='not_declared'||e.code==='capability_disabled')){ send.dataset.off='1'; showCanned(); askGate(); }
       if(e&&KEY_STOP.includes(e.code)) MazeKey.reject(e.code); }
   }finally{ finishRequest(my); if(my===reqId) showCard(); }
 }
 async function quick(opt){
   if(busy) return;
   if(quickLocked()){ logSep(); logLine('no','the game is running a changed program. canned changes start from the original maze, so press Reset first.'); return; }
-  if(mode==='capability'){ logSep(); logLine('you','> ['+MODES.find(m=>m.id===mode).name+'] '+opt.name+': '+opt.desc); logLine('no','no tool here. nothing to submit through.'); now={fell:false,say:'',why:'Nothing can submit a program here. "'+opt.name+'" has nowhere to go.',program:''}; quizState='ask'; renderCard(); logLine('ok','result: RULE HELD under '+MODES.find(m=>m.id===mode).name+'.'); return; }
+  if(mode==='capability'){ capAnswer(opt.name, opt.name+': '+opt.desc); return; }
   const pre=[{src:opt.src, why:opt.why, how:'You picked "'+opt.name+'".'}];
   if(REPAIRS[opt.id]) pre.push({src:REPAIRS[opt.id], say:REPAIR_SAY[opt.id], why:REPAIR_WHY[opt.id], how:'You picked "'+opt.name+'". The literal version was caught, so the page ran its repaired version.', repair:true});
   await request(opt.name+': '+opt.desc, { pre, gate: mode==='prose' ? opt : undefined });
