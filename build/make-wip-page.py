@@ -425,8 +425,244 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        # the switch box fills the width; the chart and the card share the next row on the game row's own split
        ".sw{display:block}\n"
        ".sw2{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start;margin-bottom:22px}\n"
-       "@media (min-width:900px){.sw2{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}\n"
-       ".flowbox{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px 14px;min-width:0}\n")
+       "@media (min-width:900px){.sw2{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}\n")
+
+
+# ---- the flow chart (spec_2026-10-02-maze-flow-chart.md, outreach-playbook). Ported unchanged from the approved mockup's
+# generator, 20-areas/outreach-playbook/artifacts/maze-flow-chart/build-mockup.py (version 8, every label, note, caption
+# and ALT read and approved by Mo), except the sentence under the chart, which is the body's 17px here (the mockup had 15).
+# One figure per choosable switch inside #flow; renderPos() sets #flow's data-m to the mode and CSS shows that figure.
+# what each state draws: its timeline, who the checker is, and the sentence under the figure (draft wording, Mo's to edit)
+STATES = {
+    "nothing": dict(kind="straight", cap="Your request goes to the writer, the AI that writes a new game from it (one Opus call). The game lands on this page. The rule is there, but nothing checks it."),
+    "prose": dict(kind="straight", cap="The rule is one sentence in the writer's instructions. Nothing checks the game after the writer writes it, so it lands on this page either way."),
+    "human": dict(kind="human", who="you", cap="The new game stops at a checker, and the checker is you. If you approve it, it lands on this page. If you reject it, nothing changes."),
+    "judge": dict(kind="loop", who="a second AI", cap="The new game stops at a checker: a second AI that reads the game and the writer's note (one more Opus call). An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
+    "test": dict(kind="loop", who="20 playthroughs", cap="The new game stops at a checker: code on this page that plays it 20 times. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
+    "proof": dict(kind="loop", who="every position", cap="The new game stops at a checker: code on this page that searches every position the game can reach. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
+    "construction": dict(kind="straight", cap="Nothing checks the game on its way. One pellet sits outside the game, where no program can reach it, so no game that lands on this page can be won."),
+    "capability": dict(kind="cap", cap="The writer has no tool to hand a game over, so nothing you ask for can land on this page. The page does not even call the writer, so no Opus call is spent."),
+}
+ALT = {
+    "nothing": "Your request goes to the writer, and the new game travels straight to this page. The rule floats above the track and nothing checks it.",
+    "prose": "The rule sits inside the writer as one line of its instructions. The new game travels straight to this page.",
+    "human": "The new game stops at a checker box that holds the rule. The checker is you. Approved, it lands on this page; rejected, nothing changes.",
+    "judge": "The new game stops at a checker box that holds the rule. The checker is a second AI. A rejected game loops back to the writer; an approved game lands on this page.",
+    "test": "The new game stops at a checker box that holds the rule. The checker is 20 playthroughs. A rejected game loops back to the writer; an approved game lands on this page.",
+    "proof": "The new game stops at a checker box that holds the rule. The checker searches every position. A rejected game loops back to the writer; an approved game lands on this page.",
+    "construction": "The new game travels straight to this page. The rule sits on the page itself, and one pellet sits outside the game.",
+    "capability": "The writer is greyed out and is not called. The track out of it is cut, with the rule sitting in the gap. Nothing reaches this page.",
+}
+
+
+# ---- the figure. viewBox 830 x 270: request 20-130, writer 180-340, checker slot 420-580, page 664-794, track at y=140
+def sticky(x, y, rot=-2):
+    return (f'<g transform="translate({x},{y}) rotate({rot})"><rect width="146" height="32" rx="3" fill="var(--sticky)"></rect>'
+            '<text class="fc-rule" x="73" y="21.5" text-anchor="middle">You can never win</text></g>')
+
+
+# one cross for every cut in the Capability chart, so they are the same size
+CROSS = '<path transform="translate({x},132)" d="M0 0l14 16M14 0l-14 16" fill="none" stroke="var(--sucks)" stroke-width="3" stroke-linecap="round"></path>'
+
+
+def request():
+    return ('<rect x="20" y="106" width="110" height="68" rx="10" fill="var(--card)" stroke="var(--ink-2)" stroke-width="2.5"></rect>'
+            '<g stroke="var(--muted)" stroke-width="4" stroke-linecap="round"><line x1="36" y1="128" x2="100" y2="128"></line><line x1="36" y1="144" x2="84" y2="144"></line></g>'
+            '<rect class="fc-caret" x="92" y="135" width="4" height="18" rx="2" fill="var(--teal)"></rect>'
+            '<text class="fc-lbl" x="75" y="232" text-anchor="middle">Your request</text>')
+
+
+def writer(mid):
+    lines = ('<g stroke="var(--teal)" stroke-opacity=".45" stroke-width="4" stroke-linecap="round">'
+             + ('<line x1="204" y1="150" x2="290" y2="150"></line>' if mid == "prose" else
+                '<line x1="204" y1="160" x2="316" y2="160"></line><line x1="204" y1="174" x2="316" y2="174"></line><line x1="204" y1="188" x2="276" y2="188"></line>')
+             + '</g>')
+    body = ('<rect x="180" y="78" width="160" height="124" rx="16" fill="var(--teal-soft)" stroke="var(--teal)" stroke-width="3"></rect>'
+            '<circle class="fc-gear" cx="260" cy="114" r="19" fill="none" stroke="var(--teal)" stroke-width="6" stroke-dasharray="9 7"></circle>'
+            '<circle cx="260" cy="114" r="6" fill="var(--teal)"></circle>'
+            '<rect x="336" y="124" width="10" height="32" rx="4" fill="var(--teal)"></rect>'
+            + lines + (sticky(187, 160) if mid == "prose" else ""))
+    label = '<text class="fc-lbl" x="260" y="232" text-anchor="middle">The writer</text>'
+    if mid == "capability":   # never called: greyed, its gear still
+        return f'<g opacity=".4">{body.replace(chr(32) + "class=" + chr(34) + "fc-gear" + chr(34), "")}</g>' + label + '<text class="fc-lbl" x="260" y="256" text-anchor="middle">(not called)</text>'
+    return body + label
+
+
+def checker(mid, who):
+    if mid == "human":
+        icon = ('<circle cx="500" cy="103" r="10" fill="var(--card)" stroke="var(--ink-2)" stroke-width="2.5"></circle>'
+                '<path d="M480 142a20 18 0 0 1 40 0" fill="var(--card)" stroke="var(--ink-2)" stroke-width="2.5" stroke-linecap="round"></path>')
+    elif mid == "judge":
+        icon = ('<line x1="500" y1="92" x2="500" y2="85" stroke="var(--ink-2)" stroke-width="2.5" stroke-linecap="round"></line><circle cx="500" cy="84" r="3" fill="var(--ink-2)"></circle>'
+                '<rect x="476" y="93" width="48" height="40" rx="9" fill="var(--card)" stroke="var(--ink-2)" stroke-width="2.5"></rect>'
+                '<g class="fc-eyes" fill="var(--teal)"><circle cx="490" cy="110" r="4"></circle><circle cx="510" cy="110" r="4"></circle></g>'
+                '<line x1="490" y1="123" x2="510" y2="123" stroke="var(--ink-2)" stroke-width="2.5" stroke-linecap="round"></line>')
+    elif mid == "test":
+        icon = "".join(f'<rect class="fc-dot" style="animation-delay:{(r * 5 + c) * 0.045:.3f}s" x="{467 + c * 14}" y="{88 + r * 14}" width="10" height="10" rx="2"></rect>'
+                       for r in range(4) for c in range(5))
+    else:   # proof: every position, as a tree
+        pts = [(500, 90), (480, 110), (520, 110), (468, 132), (490, 132), (510, 132), (532, 132)]
+        edges = [(0, 1), (0, 2), (1, 3), (1, 4), (2, 5), (2, 6)]
+        icon = ('<g stroke="var(--ink-2)" stroke-width="2">' + "".join(f'<line x1="{pts[a][0]}" y1="{pts[a][1]}" x2="{pts[b][0]}" y2="{pts[b][1]}"></line>' for a, b in edges) + '</g>'
+                + "".join(f'<circle class="fc-dot" style="animation-delay:{i * 0.09:.2f}s" cx="{x}" cy="{y}" r="5.5"></circle>' for i, (x, y) in enumerate(pts)))
+    return ('<rect x="420" y="78" width="160" height="124" rx="16" fill="var(--card)" stroke="var(--teal)" stroke-width="3"></rect>'
+            + icon + sticky(427, 160)
+            + f'<text class="fc-lbl" x="500" y="232" text-anchor="middle">The checker</text><text class="fc-lbl" x="500" y="256" text-anchor="middle">({who})</text>')
+
+
+def page(mid):
+    walls = [(1, 1), (2, 1), (4, 1), (1, 3), (2, 3), (1, 5), (2, 5), (4, 5), (6, 2), (6, 4), (5, 3), (7, 3)]
+    pellets = [(0, 0), (3, 0), (5, 0), (0, 2), (3, 2), (4, 2), (0, 4), (3, 4), (5, 5), (7, 6), (0, 6), (3, 6)]
+    ox, oy, c = 673, 91, 14
+    board = ('<rect x="664" y="78" width="130" height="124" rx="10" fill="var(--arcade)"></rect>'
+             + "".join(f'<rect x="{ox + x * c + 1}" y="{oy + y * c + 1}" width="{c - 2}" height="{c - 2}" fill="var(--wall)"></rect>' for x, y in walls)
+             + "".join(f'<circle cx="{ox + x * c + c / 2}" cy="{oy + y * c + c / 2}" r="2" fill="var(--pellet)"></circle>' for x, y in pellets)
+             + f'<circle cx="{ox + 6 * c + c / 2}" cy="{oy + 3 * c + c / 2}" r="2.6" fill="var(--unreach)"></circle>'
+             + f'<circle cx="{ox + 4 * c + c / 2}" cy="{oy + 4 * c + c / 2}" r="5" fill="var(--player)"></circle>')
+    extra = ""
+    if mid == "construction":
+        extra = (sticky(657, 164) + '<circle cx="812" cy="104" r="11" fill="none" stroke="var(--unreach)" stroke-width="2" stroke-dasharray="4 4"></circle>'
+                 '<circle class="fc-out" cx="812" cy="104" r="4.5" fill="var(--unreach)"></circle>')
+    dim = ' opacity=".4"' if mid == "capability" else ""
+    g = f'<g class="fc-board"{dim}>{board}</g>'
+    return (g + extra + '<text class="fc-lbl" x="729" y="232" text-anchor="middle">Game lands</text>'
+            '<text class="fc-lbl" x="729" y="256" text-anchor="middle">on this page</text>')
+
+
+def token():
+    """The new game: a tiny cartridge that starts behind the writer and travels the track. The marks ride with it."""
+    return ('<g class="fc-tok"><rect x="300" y="123" width="40" height="34" rx="6" fill="var(--arcade)" stroke="var(--wall)" stroke-width="2.5"></rect>'
+            '<rect x="307" y="130" width="8" height="8" fill="var(--wall)"></rect><rect x="325" y="142" width="8" height="8" fill="var(--wall)"></rect>'
+            '<circle cx="329" cy="134" r="2" fill="var(--pellet)"></circle><circle cx="311" cy="147" r="3.4" fill="var(--player)"></circle>'
+            '<g class="fc-ok"><circle cx="340" cy="123" r="10" fill="var(--ships)"></circle><path d="M335 123l4 4 7-8" fill="none" stroke="var(--on-teal)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></g>'
+            '<g class="fc-no"><circle cx="340" cy="123" r="10" fill="var(--sucks)"></circle><path d="M336 119l8 8M344 119l-8 8" fill="none" stroke="var(--on-teal)" stroke-width="2.5" stroke-linecap="round"></path></g></g>')
+
+
+def figure(mid, uid):
+    st = STATES[mid]
+    kind = st["kind"]
+    line = lambda x1, x2: f'<line x1="{x1}" y1="140" x2="{x2}" y2="140" stroke="var(--ink-2)" stroke-width="3" marker-end="url(#{uid}-arr)"></line>'
+    glows = ('<rect class="fc-glow fc-gw" x="172" y="70" width="176" height="140" rx="22"></rect>'
+             + ('<rect class="fc-glow fc-gc" x="412" y="70" width="176" height="140" rx="22"></rect>' if "who" in st else "")
+             + '<rect class="fc-glow fc-gp" x="656" y="70" width="146" height="140" rx="16"></rect>')
+    track = (line(134, 175) + f'<line class="fc-pulse" x1="134" y1="140" x2="172" y2="140" stroke="var(--teal)" stroke-width="5" stroke-linecap="round"></line>'
+             if kind != "cap" else '<line x1="134" y1="140" x2="143" y2="140" stroke="var(--muted)" stroke-width="3" stroke-opacity=".5"></line>' + CROSS.format(x=148)
+             + '<line x1="168" y1="140" x2="177" y2="140" stroke="var(--line)" stroke-width="3" stroke-dasharray="3 6" stroke-linecap="round"></line>')
+    over = ""
+    if "who" in st:
+        track += line(346, 415) + line(580, 659)
+        if kind == "loop":
+            track += (f'<path d="M500 78V47H260V73" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#{uid}-arr-no)"></path>'
+                      '<text class="fc-rej" x="380" y="14" text-anchor="middle">rejected game: back to the writer, up to 6 tries</text>')
+        else:
+            track += ('<path d="M500 78V50" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-dasharray="7 6"></path>'
+                      '<path d="M494 40l12 12M506 40l-12 12" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-linecap="round"></path>'
+                      '<text class="fc-rej" x="500" y="14" text-anchor="middle">rejected game: nothing changes</text>')
+    elif kind == "cap":
+        track += ('<line x1="346" y1="140" x2="372" y2="140" stroke="var(--muted)" stroke-width="3" stroke-opacity=".5"></line>'
+                  + CROSS.format(x=380) +
+                  '<line x1="404" y1="140" x2="656" y2="140" stroke="var(--line)" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"></line>')
+        over = sticky(427, 124) + '<text class="fc-note" x="500" y="186" text-anchor="middle">no tool to hand a game over</text>'
+    else:
+        track += line(346, 659)
+        if mid == "nothing":
+            over = sticky(427, 40) + '<text class="fc-note" x="500" y="100" text-anchor="middle">nothing checks it</text>'
+    body = (glows + track + (token() if kind != "cap" else "") + request() + writer(mid)
+            + (checker(mid, st["who"]) if "who" in st else "") + page(mid) + over)
+    return (f'<figure class="flowfig" data-m="{mid}"><svg class="fig fc fc-{kind}" viewBox="0 -12 830 282" role="img" aria-labelledby="{uid}-t" xmlns="http://www.w3.org/2000/svg">'
+            f'<title id="{uid}-t">{html.escape(ALT[mid])}</title><defs>'
+            f'<marker id="{uid}-arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--ink-2)"></path></marker>'
+            f'<marker id="{uid}-arr-no" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--sucks)"></path></marker>'
+            f'</defs>{body}</svg><figcaption>{html.escape(st["cap"])}</figcaption></figure>')
+
+
+CSS_FIG = """
+/* the figure: the Taste Extractor recipe (inline SVG, tokens, keyframes on a loop, a still frame when motion is off) */
+.flowbox{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px 14px;min-width:0}
+.flowfig{margin:0;display:grid;gap:8px}
+.fig{display:block;width:100%;height:auto}
+.flowfig figcaption{font:400 17px/1.5 var(--serif);color:var(--ink);max-width:78ch;padding-inline:4px}
+.fc-lbl{font:600 23px var(--sans);fill:var(--ink)}
+.fc-sub{font:500 20px var(--sans);fill:var(--ink-2)}
+.fc-note{font:500 22px var(--sans);fill:var(--ink-2)}
+.fc-rej{font:600 21px var(--sans);fill:var(--sucks)}
+.fc-rule{font:600 16px var(--sans);fill:var(--sticky-ink)}
+.fc-glow{fill:var(--teal-soft);stroke:var(--teal);stroke-width:3;opacity:0}
+.fc-dot{fill:var(--line)}
+.fc-ok,.fc-no{opacity:0}
+.fc-tok{transform:translate(60px,0)}
+.fc-pulse{stroke-dasharray:14 80;stroke-dashoffset:-60}
+.fc-gear{transform-box:fill-box;transform-origin:center;animation:fc-spin 7s linear infinite}
+.fc-caret{animation:fc-blink 1.1s steps(1) infinite}
+.fc-eyes{animation:fc-scan 1.6s ease-in-out infinite}
+.fc-out{transform-box:fill-box;transform-origin:center;animation:fc-throb 1.8s ease-in-out infinite}
+.fc-board{transform-box:fill-box;transform-origin:center}
+@keyframes fc-spin{to{transform:rotate(360deg)}}
+@keyframes fc-blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes fc-scan{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+@keyframes fc-throb{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
+/* straight through: Nothing, Prose, Construction */
+.fc-straight .fc-pulse{animation:fcS-pulse 8s linear infinite}
+.fc-straight .fc-gw{animation:fcS-gw 8s linear infinite}
+.fc-straight .fc-tok{animation:fcS-tok 8s ease-in-out infinite}
+.fc-straight .fc-gp{animation:fcS-gp 8s linear infinite}
+.fc-straight .fc-board{animation:fcS-pop 8s ease-out infinite}
+@keyframes fcS-pulse{0%{stroke-dashoffset:14}10%,100%{stroke-dashoffset:-60}}
+@keyframes fcS-gw{0%,7%{opacity:0}11%,22%{opacity:1}28%,100%{opacity:0}}
+@keyframes fcS-tok{0%,24%{transform:translate(0,0)}64%,100%{transform:translate(404px,0)}}
+@keyframes fcS-gp{0%,61%{opacity:0}65%,84%{opacity:1}92%,100%{opacity:0}}
+@keyframes fcS-pop{0%,63%{transform:scale(1)}68%{transform:scale(1.06)}75%,100%{transform:scale(1)}}
+/* a checker that is you: Human */
+.fc-human .fc-pulse{animation:fcH-pulse 9s linear infinite}
+.fc-human .fc-gw{animation:fcH-gw 9s linear infinite}
+.fc-human .fc-gc{animation:fcH-gc 9s linear infinite}
+.fc-human .fc-tok{animation:fcH-tok 9s ease-in-out infinite}
+.fc-human .fc-ok{animation:fcH-ok 9s linear infinite}
+.fc-human .fc-gp{animation:fcH-gp 9s linear infinite}
+.fc-human .fc-board{animation:fcH-pop 9s ease-out infinite}
+@keyframes fcH-pulse{0%{stroke-dashoffset:14}9%,100%{stroke-dashoffset:-60}}
+@keyframes fcH-gw{0%,6%{opacity:0}9%,17%{opacity:1}22%,100%{opacity:0}}
+@keyframes fcH-tok{0%,18%{transform:translate(0,0)}32%,56%{transform:translate(180px,0)}72%,100%{transform:translate(404px,0)}}
+@keyframes fcH-gc{0%,30%{opacity:0}34%,54%{opacity:1}59%,100%{opacity:0}}
+@keyframes fcH-ok{0%,54%{opacity:0}57%,74%{opacity:1}77%,100%{opacity:0}}
+@keyframes fcH-gp{0%,69%{opacity:0}73%,88%{opacity:1}95%,100%{opacity:0}}
+@keyframes fcH-pop{0%,71%{transform:scale(1)}76%{transform:scale(1.06)}83%,100%{transform:scale(1)}}
+/* a checker that sends a rejected game back: Judge, Code (tests), Code (proof). Try one is rejected, try two is approved */
+.fc-loop .fc-pulse{animation:fcL-pulse 13s linear infinite}
+.fc-loop .fc-gw{animation:fcL-gw 13s linear infinite}
+.fc-loop .fc-gc{animation:fcL-gc 13s linear infinite}
+.fc-loop .fc-tok{animation:fcL-tok 13s ease-in-out infinite}
+.fc-loop .fc-no{animation:fcL-no 13s linear infinite}
+.fc-loop .fc-ok{animation:fcL-ok 13s linear infinite}
+.fc-loop .fc-gp{animation:fcL-gp 13s linear infinite}
+.fc-loop .fc-board{animation:fcL-pop 13s ease-out infinite}
+.fc-loop .fc-dot{animation:fcL-dot 13s linear infinite}
+@keyframes fcL-pulse{0%{stroke-dashoffset:14}6%,100%{stroke-dashoffset:-60}}
+@keyframes fcL-gw{0%,4%{opacity:0}6%,12%{opacity:1}15%,51%{opacity:0}53%,59%{opacity:1}62%,100%{opacity:0}}
+@keyframes fcL-tok{0%,14%{transform:translate(0,0)}23%,33%{transform:translate(180px,0)}38%{transform:translate(180px,-93px)}47%{transform:translate(-60px,-93px)}52%{transform:translate(-60px,-23px)}54%,61%{transform:translate(0,0)}70%,79%{transform:translate(180px,0)}89%,100%{transform:translate(404px,0)}}
+@keyframes fcL-gc{0%,22%{opacity:0}24%,32%{opacity:1}35%,69%{opacity:0}71%,78%{opacity:1}81%,100%{opacity:0}}
+@keyframes fcL-no{0%,32%{opacity:0}34%,51%{opacity:1}53%,100%{opacity:0}}
+@keyframes fcL-ok{0%,78%{opacity:0}80%,90%{opacity:1}92%,100%{opacity:0}}
+@keyframes fcL-gp{0%,86%{opacity:0}89%,96%{opacity:1}99%,100%{opacity:0}}
+@keyframes fcL-pop{0%,87%{transform:scale(1)}91%{transform:scale(1.06)}95%,100%{transform:scale(1)}}
+@keyframes fcL-dot{0%,23%{fill:var(--line)}25%,31%{fill:var(--teal)}34%,70%{fill:var(--line)}72%,77%{fill:var(--teal)}80%,100%{fill:var(--line)}}
+/* no tool: Capability. Nothing moves: the page never calls the writer, and the track out of it is cut */
+@media (prefers-reduced-motion:reduce){.fc *{animation:none!important}}
+"""
+
+
+# the page's tokens lack the white that sits on teal; the mockup's value, light and both dark blocks
+FLOW_TOKENS = (':root{--on-teal:#FFFFFF}\n'
+               '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--on-teal:#FFFFFF}}\n'
+               ':root[data-theme="dark"]{--on-teal:#FFFFFF}\n')
+FLOW_ORDER = [mid for mid, _, _ in MODES if mid != "weights"]
+if set(FLOW_ORDER) != set(STATES) or set(STATES) != set(ALT):
+    sys.exit("make-wip-page: the flow chart's STATES and ALT must hold one entry for each choosable MODES id")
+# the page styles every <figure> and <figcaption> as a framed article figure (the mockup's page did not); inside the
+# chart box the figure is unframed, as in the mockup
+CSS += (FLOW_TOKENS + CSS_FIG.strip("\n") + "\n#flow .flowfig{display:none;padding:0;border:0;border-radius:0;background:none;box-shadow:none}\n"
+        + "#flow .flowfig figcaption{margin-top:0}\n"
+        + "".join(f'#flow[data-m="{m}"] .flowfig[data-m="{m}"]{{display:grid}}\n' for m in FLOW_ORDER))
 
 
 def once(text, old, new, what):
@@ -577,6 +813,12 @@ def main():
     t = once(t, "  " + static + '</div>\n\n<div class="grid" data-noedit="">',
              '</div>\n<div class="sw2"><div class="flowbox" id="flow"></div>' + static + '</div>\n\n<div class="grid" data-noedit="">',
              "the card moves out of the switch box into a row of its own")
+    # the chart: every choosable switch's figure, the opening one shown in the first paint; the page's renderPos()
+    # keeps #flow's data-m on the selected mode, so the chart follows the real switch
+    figs = "".join(figure(m, "f" + m) for m in FLOW_ORDER)
+    t = once(t, '<div class="flowbox" id="flow"></div>', f'<div class="flowbox" id="flow" data-m="{START}">' + figs + '</div>', "chart box")
+    t = once(t, "function renderPos(){", "function renderPos(){ const fl=document.getElementById('flow'); if(fl) fl.dataset.m=mode;",
+             "chart follows the switch")
     t = once(t, '<div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div>',
              f'<div class="card slot" id="card"><div class="top"><span class="badge">{names[START]}</span></div>', "static result slot")
 
