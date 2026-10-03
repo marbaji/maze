@@ -731,6 +731,8 @@ HUMAN_OPENED = (' You opened the program and approved it without reading to the 
 HUMAN_HOLD = "the page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
 # the card while a held-back typed request is re-asked (Mo, 2026-10-03: the plainer wording); the round number goes before it
 HUMAN_HOLD_CARD = "The AI's game could still be won, so this page asked the AI to try again before showing it to you."
+# what the log's result line says after "RULE BROKEN under Human." when the reader approved the gift (Mo, 2026-10-03)
+GIFT_RESULT = " you swapped in the page's own winnable program."
 HUMAN_EDITS = [
     ("  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n  if(REPAIRS[opt.id]) pre.push(",
      "  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n"
@@ -774,8 +776,14 @@ HUMAN_EDITS = [
      "    if(r.ok&&r.swap){",
      1, "the final card after an approval has no round prefix"),
     ("return accept(r.swap.src, how+' You read the program to the bottom and swapped in a winnable one before approving.', say, c2.proof, Object.assign({}, ctx, {whyLine:r.swap.why}), undefined, how+' You read the program to the bottom, swapped in a winnable one, and approved it. Nothing checks what you approve.'); }",
-     "return accept(r.swap.src, fin(' You read the program to the bottom and swapped in a winnable one before approving.'), say, Object.assign({}, c2.proof, {status:'winnable'}), Object.assign({}, ctx, {whyLine:r.swap.why, opened:true}), undefined, fin(' You read the program to the bottom, swapped in a winnable one, and approved it. Nothing checks what you approve.')); }   // the gift is the page's own winnable \"Open the pocket\": RULE BROKEN even when the search of it runs out of budget (Mo, 2026-10-03)",
+     "const own=r.swap.id==='pocket'; if(own) now.gift=true;   // only the page's own \"Open the pocket\" is taken as winnable; any other swap is scored as the search returned it\n"
+     "      return accept(r.swap.src, fin(' You read the program to the bottom and swapped in a winnable one before approving.'), say, own ? Object.assign({}, c2.proof, {status:'winnable'}) : c2.proof, Object.assign({}, ctx, {whyLine:r.swap.why, opened:true}), undefined, fin(' You read the program to the bottom, swapped in a winnable one, and approved it. Nothing checks what you approve.')); }   // the gift is the page's own winnable \"Open the pocket\": RULE BROKEN even when the search of it runs out of budget (Mo, 2026-10-03)",
      1, "approving the swapped gift is RULE BROKEN whatever the search's budget"),
+    # the result line in the log says what happened: on the gift path no search found anything, the reader swapped in the page's
+    # own program (now.gift, set in the swap branch; every request starts from a fresh `now`, so it never carries over)
+    ("(now.fell?' the search found a winning sequence of moves.':'')",
+     "(now.fell?(now.gift?" + js_str(GIFT_RESULT) + ":' the search found a winning sequence of moves.'):'')",
+     1, "the result line after the gift swap says the reader swapped the program in"),
     ("return acceptOffer(how+(r.opened?' You opened the program and approved it without reading",
      "return acceptOffer(fin(r.opened?' You opened the program and approved it without reading", 1, "the held card after an approval, without the round prefix"),
     ("), how+(r.opened?' You opened the program and approved it. A winnable",

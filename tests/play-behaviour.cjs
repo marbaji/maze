@@ -990,11 +990,17 @@ async function case19() {
 async function case21() {
   // Human, typed (?mock), approval after a held-back round: (a) approving from the summary gives a final card with no "Round N." prefix,
   // which belongs only to the mid-retry card; (b) swapping in the gift and approving is RULE BROKEN with the swap text even when the
-  // page's search of the swapped program runs out of budget (CAPS made tiny while the panel waits), and again no round prefix
+  // page's search of the swapped program runs out of budget (CAPS made tiny while the panel waits), and again no round prefix; the log's
+  // result line then says the reader swapped the program in, not that a search found a win; (c) a swap that is not the page's own
+  // "Open the pocket" (its id changed while the panel waits) is scored as the search returned it, so a starved search is not RULE BROKEN
   const HOLD = pageConst('HUMAN_HOLD'), holdCard = pageLits(/so that the game stays unwinnable\.', (LIT), 'held'\)/), go = pageLits(/now\.why=\(fellWhy\|\|why\)\+(LIT);/);
   const swapLit = (SRC.match(new RegExp(`(${LIT})`, 'g')) || []).filter((s) => /swapped in a winnable one, and approved it/.test(s));
+  const giftLit = pageLits(/now\.gift\?(LIT):(LIT)\)/), approvedLit = pageLits(/if\(r\.ok&&r\.swap\)\{ logLine\('ok',(LIT)\+r\.swap\.name\+/);
   check(typeof HOLD === 'string' && holdCard && go && swapLit.length === 1, `case 21: premise: the page has the hold line, the hold card, the broken suffix and one swap text (${swapLit.length})`);
-  if (typeof HOLD !== 'string' || !holdCard || !go || swapLit.length !== 1) return;
+  check(giftLit && approvedLit, 'case 21: premise: the page has the gift result text beside the search one, and the line it logs when the gift is approved');
+  if (typeof HOLD !== 'string' || !holdCard || !go || swapLit.length !== 1 || !giftLit || !approvedLit) return;
+  const [GIFT_RESULT, SEARCH_RESULT] = giftLit, [APPROVED] = approvedLit;
+  const FINISHED = /search|no win is reachable|winning sequence|game states/i;   // what any line reporting a search says (the lines enforce() and the longer pass write)
   const [HOLD_CARD] = holdCard, [GO] = go, SWAP = evalLit(swapLit[0]).trim();
   const ROUND = /Round \d+\./;
   const { context, page } = await open({ name: 'case 21', hash: '?mock' });
@@ -1024,11 +1030,24 @@ async function case21() {
   await fresh('swap');
   await toPanel('swap');
   const caps0 = await page.evaluate(() => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C.maxStates = 20; return o; });
+  const pocket = await page.evaluate(() => window.__nrp.QUICK.find((o) => o.id === 'pocket').src);
+  const name = await page.evaluate(() => { const s = document.querySelector('#seg button.on span'); return s ? s.textContent.trim() : ''; });
   await page.click('#approve details summary');
   await page.click('#approve .giftbtn');
+  check((await page.evaluate(() => document.querySelector('#approve details pre').textContent)) === pocket, 'case 21 (swap): premise: the gift the panel offers is the page\'s own "Open the pocket" program');
+  const n1 = (await logLines(page)).length;
   await page.click('#approve .ok'); await busyEnd('swap approve'); await sleep(300);
   c = await resultCard(page);
-  const pocket = await page.evaluate(() => window.__nrp.QUICK.find((o) => o.id === 'pocket').src);
+  {
+    const L = (await logLines(page)).slice(n1), ai = L.findIndex((x) => x.startsWith(APPROVED)), ri = L.findIndex((x) => x.startsWith('result: '));
+    const want = L[ri] && L[ri].replace(GIFT_RESULT, '') + GIFT_RESULT;   // the mode name is the page's; the tail is the claim
+    check(ai >= 0 && ri > ai + 1, `case 21 (swap): premise: the log has the approval line, then at least one line, then the result line (${ai}, ${ri})`);
+    check(ri >= 0 && L[ri] === want && /^result: RULE BROKEN under \S+\.$/.test(L[ri].slice(0, -GIFT_RESULT.length)), `case 21 (swap): the result line says the reader swapped the program in (got ${JSON.stringify(L[ri])})`);
+    check(name && ri >= 0 && L[ri] === 'result: RULE BROKEN under ' + name + '.' + GIFT_RESULT, `case 21 (swap): the result line names the switch position (${JSON.stringify(name)}; got ${JSON.stringify(L[ri])})`);
+    check(SEARCH_RESULT.includes('the search found a winning sequence') && !L.some((x) => x.includes('the search found a winning sequence')), `case 21 (swap): no line claims the search found a winning sequence (${JSON.stringify(L.filter((x) => x.includes('winning sequence')))})`);
+    const between = ai >= 0 && ri > ai ? L.slice(ai + 1, ri) : [];
+    check(!between.some((x) => FINISHED.test(x)), `case 21 (swap): premise: between the approval and the result no line reports a finished search (${JSON.stringify(between.filter((x) => FINISHED.test(x)))})`);
+  }
   const pv = await page.evaluate(async (src) => { const r = await window.__nrp.checkCandidate(src, { reqId: -1 }); return r.ok ? r.proof.status : 'error: ' + r.error; }, pocket);
   await page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), caps0);
   check(pv === 'capped' || pv === 'unproven', `case 21 (swap): premise: with the starved budget the search of the gift does not finish (search: ${pv})`);
@@ -1036,6 +1055,25 @@ async function case21() {
   check(c.st === 'RULE BROKEN', `case 21 (swap): the badge after approving the gift (got ${c.st})`);
   check(c.why === SWAP + GO, `case 21 (swap): the card (got ${JSON.stringify(c.why)}, want ${JSON.stringify(SWAP + GO)})`);
   check(!ROUND.test(c.why), `case 21 (swap): the final card carries a round prefix (${JSON.stringify(c.why.slice(0, 80))})`);
+
+  // (c) a swap that is not the page's own pocket program: the same clicks, with the gift's id changed before Approve and the search starved
+  await fresh('other swap');
+  await toPanel('other swap');
+  const caps1 = await page.evaluate(() => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C.maxStates = 20; return o; });
+  await page.click('#approve details summary');
+  await page.click('#approve .giftbtn');
+  await page.evaluate(() => { window.__nrp.QUICK.find((o) => o.id === 'pocket').id = 'pocket-not-the-gift'; });
+  const n2 = (await logLines(page)).length;
+  await page.click('#approve .ok'); await busyEnd('other swap approve'); await sleep(300);
+  await page.evaluate(() => { window.__nrp.QUICK.find((o) => o.id === 'pocket-not-the-gift').id = 'pocket'; });
+  c = await resultCard(page);
+  await page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), caps1);
+  {
+    const L = (await logLines(page)).slice(n2), res = L.filter((x) => x.startsWith('result: '));
+    check(L.some((x) => x.startsWith(APPROVED)) && (await page.evaluate(() => window.__nrp.program())) === pocket, 'case 21 (other swap): premise: the swap was approved and the game runs the swapped program');
+    check(res.length === 1 && !res[0].startsWith('result: RULE BROKEN') && !res[0].includes(GIFT_RESULT), `case 21 (other swap): a swap that is not the page's own program is not taken as winnable (log: ${JSON.stringify(res)})`);
+    check(c.st !== 'RULE BROKEN', `case 21 (other swap): the badge follows the search, which did not finish (got ${c.st})`);
+  }
   await context.close();
 }
 
