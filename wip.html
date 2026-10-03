@@ -1991,7 +1991,7 @@ function cannedShown(){ return !document.getElementById('tabQuick').hidden; }
 function showCanned(){ if(cannedShown()) return; document.getElementById('tabQuick').hidden=false; const n=document.getElementById('cannedwhy'); n.innerHTML=CANNED_WHY; n.hidden=false; renderPos(); }
 document.getElementById('tabQuick').onclick=()=>setTab('quick'); document.getElementById('tabFree').onclick=()=>{ setTab('free'); permNote(); };
 // v37 (Mo, 2026-09-27): a reader who declined the page's use of Claude is told why Ask is off. state() never prompts; any other state shows nothing new
-const PERM_DENIED='You chose not to let this page use Claude, so typed requests are off for this visit. Reload the page and choose Allow when it asks. Until then, the canned changes still work, except under Prose and Judge, which need Claude too.';
+const PERM_DENIED='You chose not to let this page use Claude, so typed requests are off for this visit. Reload the page and choose Allow when it asks. Until then, the canned changes still work.';
 async function permNote(){ let st=null; try{ const p=window.claude&&typeof window.claude.use==='function' ? await window.claude.use('permissions') : null; st=p ? await p.state('sample') : null; }catch(e){ st=null; }
   if(MOCK&&window.__mock&&window.__mock.perm) st=window.__mock.perm;
   if(st!=='denied') return; showCanned(); let el=document.getElementById('permnote'); const q=document.getElementById('q'); if(!el){ el=document.createElement('p'); el.id='permnote'; el.className='note'; q.parentNode.insertBefore(el, q); } el.textContent=PERM_DENIED;
@@ -2117,7 +2117,7 @@ function failText(e){
   const c=e&&e.code; const partial=e&&typeof e.text==='string'&&e.text.length ? ' The AI had written '+e.text.length+' characters when it stopped; that partial answer is not used.' : '';
   const T={
     not_granted:'You declined the permission, so the AI cannot answer on this page load. Reload the page to be asked again.',
-    sampling_disabled:'Claude is not available on this account, so the AI part of the page is off. The canned changes still work, except Prose and Judge.',
+    sampling_disabled:'Claude is not available on this account, so the AI part of the page is off. The canned changes still work.',
     not_declared:'This page is no longer allowed to call Claude. That is a publishing mistake on our side, not yours.',
     capability_disabled:'This viewer cannot call Claude from a page. Open the page in the claude.ai app.',
     session_expired:'Your claude.ai session expired. Sign in again and ask once more.',

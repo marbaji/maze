@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The committed index.html is exactly what build/make-play-page.py makes from the committed inputs
-# (build/input/game-public.html and src/byok.js). Exit 1 on any difference.
+# (build/input/game-public.html and src/byok.js, through build/flow_edits.py). Exit 1 on any difference.
 set -u
 here="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)" || { echo "FAILED rebuild-check: mktemp"; exit 1; }

@@ -1,8 +1,8 @@
 'use strict';
-// Behaviour tests of the play page (index.html), with no real key and without ?mock.
-//   node tests/play-behaviour.cjs
+// Behaviour tests of the play page, with no real key; ?mock only where a case says so.
+//   node tests/play-behaviour.cjs [page]   (page relative to the repo root; default index.html, the live page; wip.html is the preview)
 // Two transports: page.route() fulfils complete Anthropic answers; a small Node streaming server on 127.0.0.1:8766 holds a stream open
-// (Stop, Forget, timeouts). The streaming cases load a TEST COPY of index.html, with the adapter's API constant, the CSP connect-src and the
+// (Stop, Forget, timeouts). The streaming cases load a TEST COPY of the page, with the adapter's API constant, the CSP connect-src and the
 // judge timeout pointed at the test; the shipped page is never changed and has no URL override. The static server serves a temporary folder
 // that links to the repo's files and holds the copy, so the harness never writes into the repo.
 // PLAYWRIGHT_PATH (optional) points at a playwright install; CHROME (optional) at a Chromium binary; PYTHON (optional) at python3.
@@ -14,13 +14,30 @@ const { spawn } = require('child_process');
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
 const ROOT = path.resolve(__dirname, '..');
+const PAGE = process.argv[2] || 'index.html';
 const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const SPORT = 8766, SORIGIN = `http://127.0.0.1:${SPORT}`;
 const API = 'https://api.anthropic.com/v1/messages', SAPI = `${SORIGIN}/v1/messages`;
 const COPY = '.play-stream-copy.html';
 const COPY_JUDGE_MS = 8000;   // a CI runner is slower than a laptop: Stop and Forget are given 3 s to act, well inside this
 const KEY = 'sk-ant-api03-testQNoA', KEY2 = 'sk-ant-api03-testN3W1';   // fake, short: never a real key
-const ASK_MSG = "To use Ask anything, paste an Anthropic API key below. It stays in this tab until you close it or press Forget key, and it goes only to Anthropic, nowhere else. All the code runs on this page, so you can read it with View Source; the same code is published at github.com/marbaji/maze. Until then, you can use the \"Canned changes\" mode, which are saved ready-made changes that run without an API key.";
+// ---- constants the page itself holds, read from the page's source (the shipped text), so a test follows a reworded constant and still
+// fails when the page stops using it. Each is a string literal or a + chain of them.
+const SRC = fs.readFileSync(path.join(ROOT, PAGE), 'utf8');
+const LIT = String.raw`(?:'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")`;
+const evalLit = (s) => { if (!new RegExp(`^${LIT}(?:\\+${LIT})*$`).test(s)) throw new Error('not a string literal chain: ' + s.slice(0, 60)); return Function(`'use strict'; return (${s});`)(); };
+// the value assigned to NAME (const NAME=... or , NAME=...), or null when the page has no such constant (a premise the caller checks)
+function pageConst(name) {
+  const found = [...SRC.matchAll(new RegExp(String.raw`(?:const |, ?)${name}=(${LIT}(?:\+${LIT})*)[,;]`, 'g'))];
+  return found.length === 1 ? evalLit(found[0][1]) : null;
+}
+// the string literals captured by a pattern over the page source (each group a literal), or null when it does not match exactly once
+function pageLits(re) {
+  const found = [...SRC.matchAll(new RegExp(re.source.replace(/LIT/g, LIT), 'g'))];
+  return found.length === 1 ? found[0].slice(1).map(evalLit) : null;
+}
+const ASK_MSG_HTML = pageConst('ASK_MSG');   // HTML (the repo address is a link); what a reader sees is its text, below
+const asText = (page, h) => page.evaluate((h) => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.trim(); }, h);
 const BAD_SHAPE = "This doesn't look like an Anthropic key. Anthropic keys start with sk-ant-.";
 const T = {
   bad_key: 'Anthropic rejected this key. Check it was copied whole, or create a new one, then paste it again.',
@@ -89,7 +106,7 @@ function startStreamServer() {
 }
 
 function writeCopy() {
-  let t = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  let t = fs.readFileSync(path.join(ROOT, PAGE), 'utf8');
   const swap = (a, b) => { const n = t.split(a).length - 1; if (n !== 1) throw new Error(`test copy: ${JSON.stringify(a)} matched ${n} times`); t = t.replace(a, b); };
   swap(`const API = '${API}'`, `const API = '${SAPI}'`);
   swap('connect-src https://api.anthropic.com"', `connect-src ${SORIGIN}"`);
@@ -108,7 +125,7 @@ async function open(opts = {}) {
   const context = await browser.newContext({ viewport: opts.viewport || { width: 1280, height: 900 } });
   if (opts.init) await context.addInitScript(opts.init);
   const page = await context.newPage();
-  const file = opts.copy ? COPY : 'index.html';
+  const file = opts.copy ? COPY : PAGE;
   const failed = [], consoleErrors = [];
   page.on('console', (m) => { if (m.type() === 'error' && !/\/favicon\.ico$/.test(m.location().url || '')) consoleErrors.push(m.text()); });   // the static server has no favicon; nothing else may log an error
   page.on('pageerror', (e) => failures.push(`page error (${opts.name || file}): ${e.message}`));
@@ -163,6 +180,8 @@ async function canned(page, i = 0) { await page.click('#tabQuick'); await page.c
 // ---------------------------------------------------------------- cases
 async function case1() {
   const { context, page, failed } = await open({ name: 'case 1' });
+  check(typeof ASK_MSG_HTML === 'string', 'case 1: premise: the page has an ASK_MSG constant');
+  const ASK_MSG = await asText(page, ASK_MSG_HTML || '');
   const fonts = [];
   page.on('response', (r) => { if (/\/fonts\//.test(r.url())) fonts.push({ url: r.url(), status: r.status() }); });
   const s = await state(page);
@@ -182,8 +201,9 @@ async function case1() {
   const eaten0 = await page.textContent('#eaten');
   await page.keyboard.press('ArrowLeft');
   await until(async () => Number(await page.textContent('#eaten')) > Number(eaten0), 5000, 'the player to eat a pellet after an arrow key');
-  // the first canned change applies: the walled-in pellet is no longer out of reach
+  // the first canned change applies under Code (proof): the walled-in pellet is no longer out of reach
   check((await page.textContent('#unr')) === '1', 'case 1: premise: one pellet starts out of reach');
+  await setMode(page, 'Code (proof)');
   await canned(page, 0);
   await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, 'the first canned change to finish');
   const log = await page.textContent('#log');
@@ -228,6 +248,7 @@ async function case4() {
   routed = [];
   const { context, page } = await open({ name: 'case 4' });
   await saveKey(page, KEY);
+  await setMode(page, 'Code (proof)');
   await ask(page, 'make a small different game with a door');
   await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, 'the typed ask to finish');
   const log = await page.textContent('#log');
@@ -277,14 +298,15 @@ async function case5() {
 }
 
 async function case6() {
-  // credential and billing errors in Code (typed: the writer), Judge (canned: the judge) and Prose (canned: the gate)
-  for (const [mode, how, kind] of [['Code (proof)', 'ask', 'writer'], ['Judge', 'canned', 'judge'], ['Prose', 'canned', 'gate']]) {
+  // credential and billing errors in Code (typed: the writer) and Judge (typed: the judge, after the writer). A canned change calls no model
+  // under any switch (case 13), so there is no canned row and no Prose row: Prose's only call was the one about a canned change
+  for (const [mode, how, kind] of [['Code (proof)', 'ask', 'writer'], ['Judge', 'ask', 'judge']]) {
     for (const code of ['bad_key', 'permission', 'no_credit']) {
       routed = [];
       const { context, page } = await open({ name: `case 6 ${mode} ${code}`, answers: { [kind]: [code] } });
       const at = `case 6 (${mode}, ${code})`;
       await saveKey(page, KEY);
-      if (mode !== 'Code (proof)') await setMode(page, mode);
+      await setMode(page, mode);
       if (how === 'ask') await ask(page, 'make a small different game with a door'); else await canned(page, 0);
       await until(() => routed.some((r) => r.kind === kind), 30000, at + ' call');
       await idle(page);
@@ -328,15 +350,15 @@ async function case6() {
 }
 
 async function case7() {
-  // Stop and Forget while each model-call stage is active
-  const stages = [['Code (proof)', 'ask', 'writer'], ['Judge', 'canned', 'judge'], ['Prose', 'canned', 'gate']];
+  // Stop and Forget while each model-call stage is active (a canned change calls no model, so both stages come from a typed request)
+  const stages = [['Code (proof)', 'ask', 'writer'], ['Judge', 'ask', 'judge']];
   for (const [mode, how, kind] of stages) {
     for (const action of ['stop', 'forget']) {
       const at = `case 7 (${action} during the ${kind} call)`;
       stream.reqs = []; stream.plan = { writer: [], judge: [], gate: [] }; stream.plan[kind] = [{ how: 'hold' }];
       const { context, page, failed, consoleErrors } = await open({ copy: true, name: at });
       await saveKey(page, KEY);
-      if (mode !== 'Code (proof)') await setMode(page, mode);
+      await setMode(page, mode);
       if (how === 'ask') await ask(page, 'make a small different game with a door'); else await canned(page, 0);
       const rec = await arrived(kind, 1);
       await sleep(300);
@@ -354,19 +376,19 @@ async function case7() {
       if (action === 'stop') check(/Stopped\./.test(s.card) && /stopped\./.test(s.log), `${at}: no cancelled state`);
       else {
         check(!Object.values(s.ss).some((v) => /sk-ant/.test(v)) && !s.keystate, `${at}: the key was not cleared`);
-        check(s.send === true && s.capnote === ASK_MSG, `${at}: Send disabled=${s.send}, capnote ${JSON.stringify(s.capnote)}`);
+        check(s.send === true && s.capnote === await asText(page, ASK_MSG_HTML || ''), `${at}: Send disabled=${s.send}, capnote ${JSON.stringify(s.capnote)}`);
       }
       await context.close();
     }
   }
-  // a timeout aborts that call: Judge retries exactly once; Prose does not retry and shows its no-answer result; neither is a Stop
+  // a timeout aborts the judge's call and it retries exactly once; it is not a Stop
   {
     const at = 'case 7 (Judge timeout)';
     stream.reqs = []; stream.plan = { writer: [], judge: [{ how: 'hang' }, { how: 'ok' }], gate: [] };
     const { context, page, failed } = await open({ copy: true, name: at });
     await saveKey(page, KEY);
     await setMode(page, 'Judge');
-    await canned(page, 0);
+    await ask(page, 'make a small different game with a door');
     const first = await arrived('judge', 1);
     await arrived('judge', 2);
     check(first.closed || aborted(failed), `${at}: the timed-out call was not aborted`);
@@ -378,25 +400,18 @@ async function case7() {
     check(!/stopped\./.test(s.log) && !/Stopped\./.test(s.card), `${at}: shows a cancelled state`);
     await context.close();
   }
-  {
-    const at = 'case 7 (Prose timeout)';
-    stream.reqs = []; stream.plan = { writer: [], judge: [], gate: [{ how: 'hang' }, { how: 'ok' }] };
-    const { context, page, failed } = await open({ copy: true, name: at });
-    await saveKey(page, KEY);
-    await setMode(page, 'Prose');
-    await canned(page, 0);
-    const first = await arrived('gate', 1);
-    await idle(page);
-    await until(() => first.closed || aborted(failed), 3000, at + ' abort').catch(() => {});
-    check(first.closed || aborted(failed), `${at}: the timed-out call was not aborted`);
-    await sleep(COPY_JUDGE_MS + 500);
-    const s = await state(page);
-    check(stream.reqs.filter((r) => r.kind === 'gate').length === 1, `${at}: ${stream.reqs.filter((r) => r.kind === 'gate').length} gate calls, want exactly 1`);
-    check(/the AI did not answer \(the request timed out\)/.test(s.log) && /did not apply the change/.test(s.card), `${at}: no no-answer result`);
-    check(!/stopped\./.test(s.log) && !/Stopped\./.test(s.card), `${at}: shows a cancelled state`);
-    await context.close();
-  }
 }
+
+// the claude.ai-hosted transport: a fake window.claude whose sample() and sample.json() count every call in window.__fakeCalls. MazeKey.init()
+// selects it over the key box when it is there. It names claude-opus-4-8 as the serving model both ways, which the page must never report on
+// the claude.ai-hosted path
+const HOSTED_INIT = `window.__PROGRAM__=${JSON.stringify(PROGRAM)};(${(() => {
+  window.__fakeCalls = 0;
+  const text = 'SAY: Made a small five by five game with a door.\nWHY: Nothing ever raises the key count, so the goal never holds.\nPROGRAM:\n' + window.__PROGRAM__;
+  const sample = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); if (opts && opts.onText) opts.onText({ text, delta: text }); return { text, truncated: false, modelTierApplied: 'complex', servedModel: 'claude-opus-4-8' }; };
+  sample.json = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); return { winnable: false, reason: 'fake' }; };
+  window.claude = { use: async (name) => (name === 'sample' ? sample : null) };
+}).toString()})();`;
 
 async function case7b() {
   {
@@ -426,7 +441,7 @@ async function case7b() {
     check(s.keyerr === T.bad_key, 'case 7b (reload, then bad_key): no bad_key error');
     check(await page.isVisible('#tabQuick'), 'case 7b (reload, then bad_key): the Canned changes tab is missing');
     await canned(page, 0);
-    await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, 'a canned change after the key was rejected');
+    await until(async () => /result: RULE (HELD|BROKEN)/.test(await page.textContent('#log')), 30000, 'a canned change after the key was rejected');
     await context.close();
   }
   {
@@ -449,19 +464,12 @@ async function case7b() {
     await context.close();
   }
   {
-    const init = () => {
-      window.__fakeCalls = 0;
-      const text = 'SAY: Made a small five by five game with a door.\nWHY: Nothing ever raises the key count, so the goal never holds.\nPROGRAM:\n' + window.__PROGRAM__;
-      // it names claude-opus-4-8 as the serving model both ways, which the page must never report on the claude.ai-hosted path
-      const sample = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); if (opts && opts.onText) opts.onText({ text, delta: text }); return { text, truncated: false, modelTierApplied: 'complex', servedModel: 'claude-opus-4-8' }; };
-      sample.json = async (input, opts) => { window.__fakeCalls++; if (opts && opts.onModel) opts.onModel('claude-opus-4-8'); return { winnable: false, reason: 'fake' }; };
-      window.claude = { use: async (name) => (name === 'sample' ? sample : null) };
-    };
     routed = [];
-    const { context, page } = await open({ name: 'case 7b claude.ai', init: `window.__PROGRAM__=${JSON.stringify(PROGRAM)};(${init})();` });
+    const { context, page } = await open({ name: 'case 7b claude.ai', init: HOSTED_INIT });
     const s = await state(page);
     check(!s.keybox, 'case 7b (claude.ai): the key box is shown');
     check(s.send === false, 'case 7b (claude.ai): Send is disabled');
+    await setMode(page, 'Code (proof)');
     await ask(page, 'make a small different game with a door');
     await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, 'the claude.ai ask');
     check((await page.evaluate(() => window.__fakeCalls)) >= 1, 'case 7b (claude.ai): the ask did not go through claude.use("sample")');
@@ -471,7 +479,7 @@ async function case7b() {
     check(!MODEL_LINE.test(log), 'case 7b (claude.ai): a serving-model line on the claude.ai-hosted path:\n' + log);
     await context.close();
     // and a judge call on the claude.ai-hosted path
-    const j = await open({ name: 'case 7b claude.ai Judge', init: `window.__PROGRAM__=${JSON.stringify(PROGRAM)};(${init})();` });
+    const j = await open({ name: 'case 7b claude.ai Judge', init: HOSTED_INIT });
     await setMode(j.page, 'Judge');
     await ask(j.page, 'make a small different game with a door');
     await until(async () => /result: RULE HELD/.test(await j.page.textContent('#log')), 30000, 'the claude.ai Judge ask');
@@ -489,6 +497,7 @@ async function case11() {
     const at = `case 11 (${model})`;
     const { context, page } = await open({ name: at, answers: { writer: [model] } });
     await saveKey(page, KEY);
+    await setMode(page, 'Code (proof)');
     await ask(page, 'make a small different game with a door');
     await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, at + ' ask');
     const log = (await state(page)).log;
@@ -500,8 +509,8 @@ async function case11() {
     check(!/\u2014/.test(lines.join('')), `${at}: an em dash in the model line`);
     await context.close();
   }
-  // a judge call and a Prose gate call served by claude-opus-4-8: one line each, naming the call
-  for (const [mode, kind, how, want] of [['Judge', 'judge', 'ask', 'the judge call was answered by Claude Opus 4.8, not Opus 5.5.'], ['Prose', 'gate', 'canned', 'the call on whether to apply it was answered by Claude Opus 4.8, not Opus 5.5.']]) {
+  // a judge call served by claude-opus-4-8: one line, naming the call (Prose's call on a canned change is gone: case 13)
+  for (const [mode, kind, how, want] of [['Judge', 'judge', 'ask', 'the judge call was answered by Claude Opus 4.8, not Opus 5.5.']]) {
     routed = [];
     const at = `case 11 (${kind} served by claude-opus-4-8)`;
     const { context, page } = await open({ name: at, answers: { [kind]: ['claude-opus-4-8'] } });
@@ -526,12 +535,12 @@ const quickWhys = (() => {
   return [...block.matchAll(/\{id:'(\w+)', name:'([^']+)'[^\n]*?why:"((?:[^"\\]|\\.)*)"/g)].map((m) => ({ id: m[1], name: m[2], why: JSON.parse('"' + m[3] + '"') }));
 })();
 const repairWhy = (id) => { const m = INPUT.match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
-const q = (why) => why.replace(/\.$/, '');
+// a why line as the page quotes it: its closing full stop dropped, and a winnable one without its "this version can be won: " opening
+const q = (why) => why.replace(/\.$/, '').replace(/^this version can be won: /, '');
 const SIM = {
-  judge_win: (w) => `This is the verdict a judge gives when it reads the program correctly: ""${q(w)}"". But a judge is a model, and a model can be talked out of the right answer.`,
   judge_keep: () => `A judge that reads the program correctly lets this change through, because the maze stays unwinnable. But a judge is a model, and a model can be talked out of the right answer.`,
-  prose_win: () => `An AI that follows the rule sentence would refuse this change, because this version can be won. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
-  prose_keep: () => `An AI that follows the rule sentence would apply this change, because the maze stays unwinnable. But an AI reads that sentence as one line among many, and a request worded the right way can get past it.`,
+  prose_win: (w) => `An AI that follows the one sentence in its instructions telling it never to make a winnable game would refuse this change, because ${q(w)}. But that sentence is one line among many the AI reads, so it might miss it.`,
+  prose_keep: () => `An AI that follows the one sentence in its instructions telling it never to make a winnable game would apply this change, because the maze stays unwinnable.`,
 };
 async function case12() {
   const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
@@ -553,15 +562,15 @@ async function case12() {
     check(!/\u2014/.test(s.card), `${at}: an em dash on the card`);
     if (mode === 'Judge' && e === win) {
       // the literal program is caught by the simulated verdict; the page's repaired version is then judged let through, and runs
-      check(s.log.includes('simulated judge: rejected this program. there is no API key, so no AI ran; a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the simulated verdict:\n${s.log}`);
+      check(s.log.includes('the page stands in for the judge on a canned change: rejected this program. a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the stand-in verdict:\n${s.log}`);
       check(/the page has a repaired version of it/.test(s.log) && applied, `${at}: the repaired version did not run:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". The literal version was caught, so the page ran its repaired version. ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (mode === 'Judge') {
-      check(applied && /simulated judge: passed\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
+      check(applied && /the page stands in for the judge on a canned change: passed\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (e === win) {
       check(!applied && !/the program goes to the check/.test(s.log), `${at}: the change was applied:\n${s.log}`);
-      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_win()), `${at}: card:\n${s.card}`);
+      check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_win(e.why)), `${at}: card:\n${s.card}`);
     } else {
       check(applied && /applied\. nobody checked it\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_keep()), `${at}: card:\n${s.card}`);
@@ -586,7 +595,7 @@ async function case10() {
   for (const mode of ['Code (proof)', 'Judge', 'Prose']) {
     routed = [];
     const { context, page } = await open({ name: `case 10 ${mode}` });
-    if (mode !== 'Code (proof)') await setMode(page, mode);
+    await setMode(page, mode);
     await canned(page, 0);
     await idle(page);
     const s = await state(page);
@@ -597,8 +606,432 @@ async function case10() {
     await context.close();
   }
   check(/caught/.test(cards['Code (proof)']) && /RULE HELD/.test(cards['Code (proof)']), 'case 10 (Code (proof)): premise: the canned change was not caught:\n' + cards['Code (proof)']);
-  for (const m of ['Judge', 'Prose']) check(/But an? (judge|AI) (is a model|reads that sentence)/.test(cards[m]), `case 10 (${m}): the card carries no simulated answer:\n` + cards[m]);
+  for (const m of ['Judge', 'Prose']) check(/But (a judge is a model|that sentence is one line among many)/.test(cards[m]), `case 10 (${m}): the card carries no stand-in answer:\n` + cards[m]);
   check(!/No judge ran|unjudged|Prose needs the AI/.test(cards.Judge + cards.Prose), 'case 10: an old no-key text is still shown');
+}
+
+// ---- the flow chart, Capability without the AI, canned changes without the AI, and Human "read to the bottom" (Mo, 2026-10-02,
+// flow-chart spec). Texts the page holds as constants are read from its source (pageConst, pageLits); a case fails its premise when the
+// page lacks them.
+const logLines = (page) => page.evaluate(() => [...document.querySelectorAll('#log .l')].map((d) => d.textContent));
+const countOf = (arr, s) => arr.filter((x) => x === s).length;
+const resultCard = (page) => page.evaluate(() => { const c = document.getElementById('card'), w = c.querySelector('.why');
+  return { why: w ? w.innerText.trim() : '', st: ((c.querySelector('.st') || {}).innerText || '').trim(), tags: w ? w.querySelectorAll('*').length : -1 }; });
+// what the reader sees of a selector: drawn elements' innerText
+const seen = (page, sel) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((e) => e.getClientRects().length && e.offsetParent !== null).map((e) => e.innerText.trim()), sel);
+// a real mouse press on a switch button where it is on screen (as a reader taps it), else the element's own click(), which does not
+// scroll; Playwright's locator click would scroll the button into view and hide a scroll the page made
+async function press(page, name) {
+  const h = await page.evaluateHandle((n) => [...document.querySelectorAll('#seg button')].find((b) => (b.querySelector('span') || {}).textContent === n) || null, name);
+  const el = h.asElement(); if (!el) return false;
+  const box = await el.boundingBox(), vh = page.viewportSize().height;
+  if (box && box.y >= 0 && box.y + box.height <= vh) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  else await el.evaluate((b) => b.click());
+  return true;
+}
+const mockReady = (page) => until(() => page.evaluate(() => !!(window.__nrp && window.__mock)), 15000, 'the ?mock test hook');
+
+async function case13() {
+  // a canned change never calls a model under Prose or Judge, with a key saved: the page's own answer is used
+  const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
+  check(win && keep, 'case 13: premise: a winnable and an unwinnable canned change');
+  if (!win || !keep) return;
+  for (const mode of ['Prose', 'Judge']) {
+    const at = `case 13 (${mode}, key saved)`;
+    routed = [];
+    const { context, page } = await open({ name: at });
+    await saveKey(page, KEY);
+    await setMode(page, mode);
+    for (const e of [win, keep]) {
+      await page.evaluate(() => document.getElementById('resetTop').click());
+      await idle(page);
+      await page.click('#tabQuick'); await page.locator('#opts .opt', { hasText: e.name }).first().click();
+      await until(async () => /result: RULE (HELD|BROKEN)/.test((await logLines(page)).slice(-1)[0] || ''), 30000, `${at} ${e.id} result`);
+      await idle(page);
+      check(routed.length === 0, `${at}: "${e.name}" made ${routed.length} model call(s): ${routed.map((r) => r.kind).join(',')}`);
+    }
+    // premise: the counter sees a call. The same page, a typed request, calls the writer
+    await page.click('#tabFree');
+    await ask(page, 'make a small different game with a door');
+    await until(() => routed.length > 0, 30000, at + ' premise call').catch(() => {});
+    await idle(page);
+    check(routed.length > 0 && routed[0].kind === 'writer', `${at}: premise: a typed request with the key reaches the model (${routed.map((r) => r.kind).join(',')})`);
+    await context.close();
+  }
+}
+
+async function case14() {
+  // Capability: the page never calls a model, canned or typed, key or no key; the Ask box works with no key; the notice is on both tabs
+  const CAP_NOTE = pageConst('CAP_NOTE'), CAP_LOG = pageConst('CAP_LOG'), cardParts = pageLits(/why:(LIT)\+asked\+(LIT)/);
+  check(typeof CAP_NOTE === 'string' && typeof CAP_LOG === 'string' && cardParts, 'case 14: premise: the page has CAP_NOTE, CAP_LOG and the Capability card');
+  if (!CAP_NOTE || !CAP_LOG || !cardParts) return;
+  const capCard = (asked) => cardParts[0] + asked + cardParts[1];
+  routed = [];
+  const { context, page, failed } = await open({ name: 'case 14' });
+  const NOTE = await asText(page, CAP_NOTE);
+  await setMode(page, 'Capability');
+  const held = 'result: RULE HELD under Capability.';
+  const one = async (at, run, asked) => {
+    const n0 = (await logLines(page)).length;
+    await run();
+    await until(async () => (await resultCard(page)).why === capCard(asked), 10000, at + ' card').catch(() => {});
+    const c = await resultCard(page), L = (await logLines(page)).slice(n0);
+    check(c.why === capCard(asked), `${at}: the card is the fixed Capability text with the request (got ${JSON.stringify(c.why)})`);
+    check(c.tags === 0, `${at}: the request is escaped on the card`);
+    check(c.st === 'RULE HELD', `${at}: RULE HELD (got ${c.st})`);
+    check(countOf(L, CAP_LOG) === 1 && countOf(L, held) === 1, `${at}: the no-tool line and the result line, once each (${JSON.stringify(L)})`);
+    check(!L.some((x) => /asking the AI/.test(x)), `${at}: the log says "asking the AI"`);
+  };
+  const noticeOn = async (where, sel) => { const v = await seen(page, sel); check(v.length === 1 && v[0] === NOTE, `case 14 (${where}): the Capability notice (got ${JSON.stringify(v)})`); };
+  for (const keyed of [false, true]) {
+    const k = keyed ? 'key' : 'no key';
+    if (keyed) await saveKey(page, KEY);
+    await page.click('#tabQuick');
+    await noticeOn(`canned tab, ${k}`, '.capnote');
+    const opts = await page.evaluate(() => [...document.querySelectorAll('#opts .opt')].map((b) => ({ n: b.querySelector('b').textContent, off: b.disabled })));
+    check(opts.length > 0 && opts.every((o) => !o.off), `case 14 (${k}): the canned changes are clickable under Capability (${JSON.stringify(opts)})`);
+    await one(`case 14 (canned, ${k})`, () => page.click('#opts .opt >> nth=0'), opts[0].n);
+    await page.click('#tabFree');
+    await noticeOn(`Ask tab, ${k}`, '.capnote');
+    check((await state(page)).send === false, `case 14 (${k}): Send is enabled under Capability`);
+    for (const typed of ['open the pocket', 'give me <b>wings</b> & a "jetpack"']) {
+      await one(`case 14 (typed ${JSON.stringify(typed)}, ${k})`, () => ask(page, typed), typed);
+      check((await state(page)).send === false, `case 14 (${k}): Send is enabled after a typed request`);
+    }
+  }
+  await page.click('#forgetkey');
+  check((await state(page)).send === false, 'case 14: Send stays enabled under Capability after Forget key');
+  check(routed.length === 0 && failed.length === 0, `case 14: Capability made ${routed.length} model call(s)`);
+  // premise: the counter sees a call. Out of Capability, no key: the box is closed again; with a key a typed request calls the writer
+  await setMode(page, 'Nothing');
+  const s = await state(page);
+  check(s.send === true && s.capnote === await asText(page, ASK_MSG_HTML || ''), `case 14: back on Nothing with no key, Send disabled=${s.send} and the key message (${JSON.stringify(s.capnote.slice(0, 60))})`);
+  check((await seen(page, '.capnote')).length === 0, 'case 14: the Capability notice is gone under Nothing');
+  // back into Capability with no key: the box opens again and the notice returns; then out again
+  await setMode(page, 'Capability');
+  check((await state(page)).send === false, 'case 14: back on Capability with no key, Send is enabled again');
+  await noticeOn('Ask tab, back on Capability, no key', '.capnote');
+  await setMode(page, 'Nothing');
+  check((await state(page)).send === true, 'case 14: on Nothing again with no key, Send is disabled again');
+  await saveKey(page, KEY);
+  await ask(page, 'open the pocket');
+  await until(() => routed.length > 0, 30000, 'case 14 premise call').catch(() => {});
+  await idle(page);
+  check(routed.length > 0, 'case 14: premise: a typed request under Nothing with a key reaches the model');
+  await context.close();
+  // ?mock (a key present): the model stand-in is never asked under Capability
+  const m = await open({ name: 'case 14 mock', hash: '?mock' });
+  await mockReady(m.page);
+  await m.page.evaluate(() => window.__nrp.setMode('capability'));
+  const calls0 = await m.page.evaluate(() => window.__mock.tiers.length);
+  await m.page.evaluate(() => window.__nrp.quick(window.__nrp.QUICK[0]));
+  await m.page.evaluate(() => window.__nrp.request('open the pocket', {}));
+  check((await m.page.evaluate(() => window.__mock.tiers.length)) === calls0, 'case 14 (mock): Capability asked the model stand-in');
+  await m.page.evaluate(() => window.__nrp.setMode('nothing'));
+  await m.page.evaluate(() => window.__nrp.request('open the pocket', {}));
+  await until(() => m.page.evaluate(() => !window.__nrp.busy()), 30000, 'case 14 mock premise');
+  check((await m.page.evaluate(() => window.__mock.tiers.length)) > calls0, 'case 14 (mock): premise: under Nothing the stand-in is asked');
+  await m.context.close();
+  // the claude.ai-hosted transport (window.claude's sample, chosen by MazeKey.init()): Capability never calls sample() or sample.json(),
+  // canned or typed; premise: under Nothing a typed request does
+  routed = [];
+  const h = await open({ name: 'case 14 claude.ai', init: HOSTED_INIT });
+  const hcalls = () => h.page.evaluate(() => window.__fakeCalls);
+  check((await state(h.page)).keybox === false, 'case 14 (claude.ai): premise: the hosted transport is in use (no key box)');
+  await setMode(h.page, 'Capability');
+  const hcard = async (at, asked) => {
+    await until(async () => (await resultCard(h.page)).why === capCard(asked), 10000, at + ' card').catch(() => {});
+    check((await resultCard(h.page)).why === capCard(asked), `${at}: the fixed Capability card (got ${JSON.stringify((await resultCard(h.page)).why)})`);
+  };
+  // the hosted path does not offer the Canned changes tab, so the first canned button is pressed through its own click handler, the one a
+  // reader's tap runs
+  const hname = await h.page.evaluate(() => { const b = document.querySelector('#opts .opt'); if (!b || b.disabled) return null; b.click(); return b.querySelector('b').textContent; });
+  check(typeof hname === 'string', 'case 14 (claude.ai): premise: an enabled canned button exists');
+  await hcard('case 14 (claude.ai, canned)', hname);
+  await idle(h.page);
+  check((await hcalls()) === 0, `case 14 (claude.ai, canned): Capability called the hosted sample ${await hcalls()} time(s)`);
+  await h.page.click('#tabFree');
+  await ask(h.page, 'open the pocket');
+  await hcard('case 14 (claude.ai, typed)', 'open the pocket');
+  await idle(h.page);
+  check((await hcalls()) === 0, `case 14 (claude.ai, typed): Capability called the hosted sample ${await hcalls()} time(s)`);
+  await setMode(h.page, 'Nothing');
+  await ask(h.page, 'open the pocket');
+  await until(async () => (await hcalls()) > 0, 30000, 'case 14 claude.ai premise').catch(() => {});
+  await idle(h.page);
+  check((await hcalls()) > 0, 'case 14 (claude.ai): premise: under Nothing a typed request calls the hosted sample');
+  check(routed.length === 0, `case 14 (claude.ai): ${routed.length} request(s) went to the network on the hosted path`);
+  await h.context.close();
+}
+
+async function case15() {
+  // Human, canned: every canned change reaches the panel with the fixed summary and the gift; Approve from the summary holds the rule; the
+  // gift swapped in and approved breaks it. No model call.
+  const BAIT = pageConst('HUMAN_BAIT'), held = pageLits(/return acceptOffer\(how\+\(r\.opened\?(LIT):(LIT)\)/), swap = pageLits(/undefined, how\+(LIT)\); \}/);
+  const neutral = pageLits(/logLine\('think', mode==='human' \? (LIT) :/);
+  check(typeof BAIT === 'string' && held && swap && neutral, 'case 15: premise: the page has HUMAN_BAIT, the approval texts and the Human log line');
+  if (!BAIT || !held || !swap || !neutral) return;
+  const [NEUTRAL] = neutral;
+  const [OPENED, NEVER] = held, [SWAP] = swap;
+  routed = [];
+  const { context, page } = await open({ name: 'case 15' });
+  await setMode(page, 'Human');
+  await page.click('#tabQuick');
+  const names = await page.evaluate(() => [...document.querySelectorAll('#opts .opt b')].map((b) => b.textContent));
+  check(names.length >= 8, `case 15: premise: ${names.length} canned changes`);
+  const runs = names.map((n) => [n, 'none']).concat([[names[0], 'openclose'], [names[0], 'swap']]);
+  for (const [name, how] of runs) {
+    const at = `case 15 ("${name}", ${how})`;
+    await page.evaluate(() => document.getElementById('resetTop').click());
+    await until(() => page.evaluate(() => [...document.querySelectorAll('#opts .opt')].every((b) => !b.disabled)), 15000, at + ' reset');
+    const n0 = (await logLines(page)).length;
+    await page.locator('#opts .opt', { hasText: name }).first().click();
+    await page.waitForSelector('#approve .approve', { timeout: 60000 });
+    if (how === 'none') {
+      // the log does not give the repair away: it says only that the program goes to the reader (Mo, 2026-10-03)
+      const L = (await logLines(page)).slice(n0);
+      check(countOf(L, NEUTRAL) === 1 && !L.some((x) => /repaired version/.test(x)), `${at}: the log says only that the program goes to you (${JSON.stringify(L)})`);
+    }
+    const p = await page.evaluate(() => { const a = document.querySelector('#approve .approve'); return { s: a.querySelector('.s').innerText.trim(), gift: !!a.querySelector('details .gift .giftbtn') }; });
+    check(p.s === BAIT, `${at}: the panel's summary is the fixed line (got ${JSON.stringify(p.s)})`);
+    check(p.gift, `${at}: the folded program carries the gift (it is unwinnable)`);
+    if (how !== 'none') await page.click('#approve details > summary');
+    if (how === 'openclose') { await page.click('#approve details > summary'); check(!(await page.evaluate(() => document.querySelector('#approve details').open)), `${at}: premise: closed again`); }
+    if (how === 'swap') await page.click('#approve .giftbtn');
+    await page.click('#approve .ok');
+    await until(async () => /RULE /.test((await resultCard(page)).st), 60000, at + ' verdict');
+    await idle(page);
+    const c = await resultCard(page), pre = `You picked "${name}".`;
+    if (how === 'swap') check(c.st === 'RULE BROKEN' && c.why.startsWith(pre + SWAP), `${at}: RULE BROKEN and the swap text (got ${c.st}: ${JSON.stringify(c.why.slice(0, 200))})`);
+    else check(c.st === 'RULE HELD' && c.why.startsWith(pre + (how === 'none' ? NEVER : OPENED)), `${at}: RULE HELD and the ${how === 'none' ? 'approved-from-the-summary' : 'opened'} text (got ${c.st}: ${JSON.stringify(c.why.slice(0, 200))})`);
+  }
+  check(routed.length === 0, `case 15: Human's canned changes made ${routed.length} model call(s)`);
+  await context.close();
+}
+
+async function case16() {
+  // Human, typed (?mock): the stand-in writer's literal program is winnable, so the page holds it back once and asks again; the repair
+  // reaches the panel with the fixed summary and the gift
+  const BAIT = pageConst('HUMAN_BAIT'), HOLD = pageConst('HUMAN_HOLD');
+  check(typeof BAIT === 'string' && typeof HOLD === 'string', 'case 16: premise: the page has HUMAN_BAIT and HUMAN_HOLD');
+  if (!BAIT || !HOLD) return;
+  const { context, page } = await open({ name: 'case 16', hash: '?mock' });
+  await mockReady(page);
+  await page.evaluate(() => window.__nrp.setMode('human'));
+  const writes = () => page.evaluate(() => window.__mock.tiers.filter((x) => x.kind === 'write').length);
+  const w0 = await writes(), n0 = (await logLines(page)).length;
+  await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+  await page.waitForSelector('#approve .approve', { timeout: 60000 });
+  const L = (await logLines(page)).slice(n0);
+  const p = await page.evaluate(() => { const a = document.querySelector('#approve .approve'); return { s: a.querySelector('.s').innerText.trim(), gift: !!a.querySelector('details .gift .giftbtn') }; });
+  check(countOf(L, HOLD) === 1, `case 16: one held-back line before the panel (got ${countOf(L, HOLD)})`);
+  check((await writes()) - w0 === 2, `case 16: two writer calls, the literal then the repair (got ${(await writes()) - w0})`);
+  check(p.s === BAIT && p.gift, `case 16: the panel shows the fixed summary and the gift (${JSON.stringify(p)})`);
+  await page.click('#approve .ok');
+  await until(() => page.evaluate(() => !window.__nrp.busy()), 60000, 'case 16 approve');
+  check((await resultCard(page)).st === 'RULE HELD', 'case 16: approved from the summary, the rule holds');
+  await context.close();
+}
+
+async function case17() {
+  // the flow chart: one figure per choosable switch, and the switch decides which one shows; a press while a request runs changes nothing
+  const { context, page } = await open({ name: 'case 17', hash: '?mock' });
+  await mockReady(page);
+  const figs = await page.evaluate(() => [...document.querySelectorAll('#flow .flowfig')].map((f) => f.dataset.m));
+  const buttons = await page.evaluate(() => [...document.querySelectorAll('#seg button')].map((b) => ({ n: (b.querySelector('span') || {}).textContent, off: b.disabled })));
+  const choosable = buttons.filter((b) => !b.off);
+  check(buttons.some((b) => b.off), 'case 17: premise: the switch has a button that cannot be chosen');
+  check(figs.length === choosable.length && new Set(figs).size === figs.length, `case 17: ${figs.length} figures (distinct: ${new Set(figs).size}) for ${choosable.length} choosable switches`);
+  const visited = [];
+  for (const b of choosable) {
+    await press(page, b.n);
+    await until(async () => (await page.evaluate(() => document.querySelector('#seg button.on span').textContent)) === b.n, 5000, 'case 17 press ' + b.n);
+    const s = await page.evaluate(() => ({ mode: window.__nrp.mode(), flow: document.getElementById('flow').dataset.m,
+      shown: [...document.querySelectorAll('#flow .flowfig')].filter((f) => getComputedStyle(f).display !== 'none' && f.getClientRects().length).map((f) => f.dataset.m) }));
+    visited.push(s.mode);
+    check(s.flow === s.mode && s.shown.length === 1 && s.shown[0] === s.mode, `case 17 (${b.n}): the chart shows the switch's own figure and only it (mode ${s.mode}, chart ${s.flow}, shown ${JSON.stringify(s.shown)})`);
+  }
+  check(JSON.stringify([...visited].sort()) === JSON.stringify([...figs].sort()), `case 17: the figures are exactly the choosable switches (${JSON.stringify(figs)} vs ${JSON.stringify(visited)})`);
+  // busy: the stand-in writer is held, the switch is disabled, and a press does not move the chart
+  await press(page, choosable[0].n);
+  const m0 = await page.evaluate(() => document.getElementById('flow').dataset.m);
+  await page.evaluate(() => { window.__mock.delay = 3000; window.__nrp.request('open the pocket', {}); });
+  await until(() => page.evaluate(() => window.__nrp.busy()), 5000, 'case 17 busy');
+  check(await page.evaluate(() => [...document.querySelectorAll('#seg button')].every((b) => b.disabled)), 'case 17: premise: the switch is disabled while a request runs');
+  await press(page, choosable[choosable.length - 1].n);
+  await sleep(200);
+  check((await page.evaluate(() => document.getElementById('flow').dataset.m)) === m0, 'case 17: a press while busy moved the chart');
+  await until(() => page.evaluate(() => !window.__nrp.busy()), 60000, 'case 17 settle');
+  await context.close();
+}
+
+async function case18() {
+  // a switch press never moves the page, on a desktop and a phone
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    const at = `case 18 (${viewport.width}px)`;
+    const { context, page } = await open({ name: at, viewport });
+    // the switch on screen with the page scrolled down: its top 300px below the top of the window
+    const y = await page.evaluate(() => { const top = document.getElementById('seg').getBoundingClientRect().top + window.scrollY; window.scrollTo(0, Math.max(0, top - 300)); return window.scrollY; });
+    await sleep(150);
+    check(y > 0, `${at}: premise: the page scrolled before the press (${y})`);
+    check(await press(page, 'Judge'), `${at}: premise: a Judge button`);
+    await sleep(400);
+    const after = await page.evaluate(() => ({ y: window.scrollY, on: document.querySelector('#seg button.on span').textContent }));
+    check(after.on === 'Judge', `${at}: premise: the press selected Judge (${after.on})`);
+    check(after.y === y, `${at}: the press moved the page from ${y} to ${after.y}`);
+    await context.close();
+  }
+}
+
+async function case19() {
+  // Human, typed (?mock), the paths around the panel: the first writer prompt carries the repair brief; the reader's Reject stops the
+  // request; a writer that only answers winnable gives six held-back rounds and the six-caught pause, which resumes; Stop and Reset during
+  // a retry end it; a program that does not run is rejected and the writer asked again; a search that cannot finish is held back too
+  const BAIT = pageConst('HUMAN_BAIT'), HOLD = pageConst('HUMAN_HOLD');
+  const holdCard = pageLits(/so that the game stays unwinnable\.', (LIT), 'held'\)/), rejected = pageLits(/logLine\('no','you rejected it\.'\); now\.say=say; now\.why=(LIT);/);
+  const six = pageLits(/\n    now\.say=lastSay; now\.why=(LIT); pause\(\);/), norun = pageLits(/if\(!chk\.ok\)\{ logLine\('no',(LIT)\+chk\.error\+'\.'\); return reject/);
+  const brief = (SRC.match(/const HONOUR_REPAIR_A=`\n([^\n`$]+)/) || [])[1];
+  check(typeof BAIT === 'string' && typeof HOLD === 'string' && holdCard && rejected && six && norun && brief, 'case 19: premise: the page has the Human texts, the six-caught card, the did-not-run line and the repair brief');
+  if (!BAIT || !HOLD || !holdCard || !rejected || !six || !norun || !brief) return;
+  const [HOLD_CARD] = holdCard, [REJECTED] = rejected, [SIX] = six, [NORUN] = norun;
+  const { context, page } = await open({ name: 'case 19', hash: '?mock' });
+  await mockReady(page);
+  await page.evaluate(() => window.__nrp.setMode('human'));
+  const writes = () => page.evaluate(() => window.__mock.tiers.filter((x) => x.kind === 'write').length);
+  const busyEnd = (what) => until(() => page.evaluate(() => !window.__nrp.busy()), 90000, what);
+  const panel = () => page.evaluate(() => { const a = document.querySelector('#approve .approve'); return a ? { s: a.querySelector('.s').innerText.trim(), gift: !!a.querySelector('details .gift .giftbtn') } : null; });
+  const atDefault = () => page.evaluate(() => window.__nrp.program() === window.__nrp.DEFAULT_PROGRAM);
+  const fresh = async (what) => { await page.evaluate(() => window.__nrp.resetGame()); await busyEnd(what + ' reset'); await page.evaluate(() => { const m = window.__mock; m.delay = 30; m.repairs = true; m.model = null; m.program = null; }); };
+  const holdSeen = (n0) => until(() => page.evaluate(([n, h]) => [...document.querySelectorAll('#log .l')].slice(n).some((d) => d.textContent === h), [n0, HOLD]), 30000, 'a held-back line');
+
+  // the first writer prompt under Human carries the repair brief and nothing tried yet; premise: under Nothing it does not
+  const wp = await page.evaluate((B) => { const n = window.__nrp; const h = n.writerPrompt('open the pocket', [], [], 1, null); n.setMode('nothing'); const x = n.writerPrompt('open the pocket', [], [], 1, null); n.setMode('human'); return { h: h.includes(B), x: x.includes(B), tried: /TRIED ON THIS REQUEST/.test(h) }; }, brief);
+  check(wp.h && !wp.tried, 'case 19: the first writer prompt under Human carries the repair brief and no TRIED marker');
+  check(!wp.x, 'case 19: premise: the first writer prompt under Nothing does not carry the repair brief');
+
+  // the reader's Reject: the game is unchanged and the writer is not asked again
+  await fresh('Reject');
+  check(await atDefault(), 'case 19 (Reject): premise: after Reset the game runs the original program');
+  await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+  await page.waitForSelector('#approve .approve', { timeout: 60000 });
+  let w0 = await writes();
+  await page.click('#approve .no'); await busyEnd('Reject'); await sleep(400);
+  check((await resultCard(page)).why === REJECTED, `case 19 (Reject): the card (got ${JSON.stringify((await resultCard(page)).why)})`);
+  check(await atDefault(), 'case 19 (Reject): the game is unchanged');
+  check((await writes()) === w0 && !(await panel()), 'case 19 (Reject): no further writer call and no panel');
+
+  // a writer that only answers winnable: six held-back rounds, no panel, the six-caught pause; the pause resumes to the panel
+  await fresh('six');
+  await page.evaluate(() => { window.__mock.repairs = false; window.__panels = 0; new MutationObserver(() => { if (document.querySelector('#approve .approve')) window.__panels++; }).observe(document.getElementById('approve'), { childList: true, subtree: true }); });
+  w0 = await writes(); let n0 = (await logLines(page)).length;
+  await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+  await busyEnd('six held back');
+  let L = (await logLines(page)).slice(n0);
+  check(countOf(L, HOLD) === 6, `case 19 (six): six held-back lines (got ${countOf(L, HOLD)})`);
+  check((await writes()) - w0 === 6, `case 19 (six): six writer calls (got ${(await writes()) - w0})`);
+  check((await page.evaluate(() => window.__panels)) === 0, 'case 19 (six): a program reached the panel');
+  check((await resultCard(page)).why.startsWith(SIX) && (await page.evaluate(() => window.__nrp.quiz())) === 'more', `case 19 (six): the six-caught pause (got ${JSON.stringify((await resultCard(page)).why.slice(0, 80))})`);
+  await page.evaluate(() => { window.__mock.repairs = true; });
+  w0 = await writes();
+  await page.click('#card button[data-more]');
+  await page.waitForSelector('#approve .approve', { timeout: 60000 });
+  const p = await panel();
+  check(p && p.s === BAIT && p.gift, `case 19 (six, resumed): the repair reaches the panel with the fixed summary and the gift (${JSON.stringify(p)})`);
+  check((await writes()) - w0 === 1, `case 19 (six, resumed): one writer call (got ${(await writes()) - w0})`);
+  await page.click('#approve .no'); await busyEnd('six resumed reject');
+
+  // Stop during a retry: the card says the AI was asked again; then the request is over, once, with no further call and no panel
+  await fresh('Stop');
+  await page.evaluate(() => { window.__mock.repairs = false; window.__mock.delay = 400; });
+  n0 = (await logLines(page)).length;
+  await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+  await holdSeen(n0);
+  check((await resultCard(page)).why.includes(HOLD_CARD), `case 19 (mid-retry): the card says the game could still be won and the AI was asked again (got ${JSON.stringify((await resultCard(page)).why)})`);
+  await page.evaluate(() => window.__nrp.stopAsk());
+  w0 = await writes(); await sleep(1500);
+  L = (await logLines(page)).slice(n0);
+  check(!(await page.evaluate(() => window.__nrp.busy())), 'case 19 (Stop during a retry): the request is still running');
+  check(countOf(L, 'stopped.') === 1, `case 19 (Stop during a retry): the log says stopped, once (${countOf(L, 'stopped.')})`);
+  check((await writes()) === w0 && !(await panel()), `case 19 (Stop during a retry): ${(await writes()) - w0} further writer call(s), panel ${!!(await panel())}`);
+  check(await atDefault(), 'case 19 (Stop during a retry): the game changed');
+
+  // Reset during a retry
+  await fresh('Reset');
+  await page.evaluate(() => { window.__mock.repairs = false; window.__mock.delay = 400; });
+  n0 = (await logLines(page)).length;
+  await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+  await holdSeen(n0);
+  await page.evaluate(() => window.__nrp.resetGame()); await busyEnd('Reset during a retry');
+  w0 = await writes(); await sleep(1500);
+  check((await writes()) === w0 && !(await panel()) && !(await page.evaluate(() => window.__nrp.busy())), 'case 19 (Reset during a retry): a further writer call, a panel, or still busy');
+
+  // a program that does not run, then one whose search cannot finish (an unbounded counter on the original game), then the repair
+  await fresh('did not run');
+  const repair = await page.evaluate(() => window.__nrp.REPAIRS.pocket);
+  const counter = await page.evaluate(() => window.__nrp.DEFAULT_PROGRAM.replace(/function init\(\) \{ return \{/, 'function init() { return { tick: 0,').replace('return { ...s, x: nx, y: ny };', 'return { ...s, x: nx, y: ny, tick: s.tick + 1 };'));
+  check(counter !== (await page.evaluate(() => window.__nrp.DEFAULT_PROGRAM)), 'case 19: premise: the unbounded-counter program differs from the original');
+  const pv = await page.evaluate(async (src) => { const r = await window.__nrp.checkCandidate(src, { reqId: -1 }, window.__nrp.LATER_CAPS); return r.ok ? r.proof.status : 'error: ' + r.error; }, counter);
+  check(pv === 'capped' || pv === 'unproven', `case 19: premise: the unbounded-counter program is not proven unwinnable (search: ${pv})`);
+  await page.evaluate(([rep, cap]) => { const q = ['SAY: done\nWHY: walls.\nPROGRAM:\nfunction init( {', 'SAY: done\nWHY: walls.\nPROGRAM:\n' + cap, 'SAY: done\nWHY: walls.\nPROGRAM:\n' + rep]; window.__prompts = []; window.__mock.model = (input) => { window.__prompts.push(input); return q.shift() || q[0]; }; }, [repair, counter]);
+  w0 = await writes(); n0 = (await logLines(page)).length;
+  await page.evaluate(() => { window.__nrp.request('give me a ladder', {}); });
+  await page.waitForSelector('#approve .approve', { timeout: 120000 });
+  L = (await logLines(page)).slice(n0);
+  const p2 = await panel();
+  check(L.some((x) => x.startsWith(NORUN)), 'case 19 (did not run): no did-not-run line');
+  check(countOf(L, HOLD) === 1, `case 19 (search cannot finish): held back once (got ${countOf(L, HOLD)})`);
+  check((await writes()) - w0 === 3 && p2 && p2.s === BAIT && p2.gift, `case 19: the third answer reaches the panel with the fixed summary and the gift (${(await writes()) - w0} calls)`);
+  const prompts = await page.evaluate(() => window.__prompts);
+  check(prompts.length === 3 && prompts[0].includes(brief) && !/TRIED ON THIS REQUEST/.test(prompts[0]) && /TRIED ON THIS REQUEST/.test(prompts[1]), 'case 19: the prompts sent: the first carries the brief, the later ones what was tried');
+  await page.click('#approve .no'); await busyEnd('final reject');
+  await context.close();
+}
+
+async function case20() {
+  // the flow chart with reduced motion: a still frame (the game at its resting place on the track, no glow, nothing running); premise: with
+  // motion on, every figure animates. On phones, 320px and 390px: the sentence under the chart is body size (17px) and nothing scrolls sideways
+  const tokX = (SRC.match(/\.fc-tok\{transform:translate\((-?\d+)px,0\)\}/) || [])[1], glowOp = (SRC.match(/\.fc-glow\{[^}]*opacity:([\d.]+)\}/) || [])[1];
+  check(tokX !== undefined && glowOp !== undefined, 'case 20: premise: the page has the still-frame rules for the game token and the glows');
+  const fig = (page) => page.evaluate(() => {
+    const vis = [...document.querySelectorAll('#flow .flowfig')].filter((f) => getComputedStyle(f).display !== 'none' && f.getClientRects().length), f = vis[0];
+    const tok = f && f.querySelector('.fc-tok');
+    return { m: f && f.dataset.m, n: vis.length, tok: tok ? getComputedStyle(tok).transform : null, glows: f ? [...f.querySelectorAll('.fc-glow')].map((g) => getComputedStyle(g).opacity) : [],
+      anims: f ? f.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').length : -1,
+      capFont: f && getComputedStyle(f.querySelector('figcaption')).fontSize, bodyFont: getComputedStyle(document.body).fontSize };
+  });
+  const choosable = (page) => page.evaluate(() => [...document.querySelectorAll('#seg button')].filter((b) => !b.disabled).map((b) => b.querySelector('span').textContent));
+  let toks = 0;
+  for (const reduce of [false, true]) {
+    const context = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 900 } }, reduce ? { reducedMotion: 'reduce' } : {}));
+    const page = await context.newPage();
+    page.on('pageerror', (e) => failures.push(`page error (case 20): ${e.message}`));
+    await page.goto(`${ORIGIN}/${PAGE}`, { waitUntil: 'load' }); await ready(page);
+    const names = await choosable(page);
+    check(names.length >= 8, `case 20: premise: ${names.length} choosable switches`);
+    for (const n of names) {
+      await press(page, n); await sleep(150);
+      const s = await fig(page), at = `case 20 (${reduce ? 'reduced motion' : 'motion'}, ${n})`;
+      check(s.n === 1, `${at}: premise: one figure shown (${s.n})`);
+      if (!reduce) { check(s.anims > 0, `${at}: premise: the figure animates with motion on (${s.anims})`); continue; }
+      if (s.tok !== null) { toks++; check(s.tok === `matrix(1, 0, 0, 1, ${tokX}, 0)`, `${at}: the game sits ${tokX}px along the track (${s.tok})`); }
+      check(s.glows.length > 0 && s.glows.every((o) => o === glowOp), `${at}: every glow at opacity ${glowOp} (${JSON.stringify(s.glows)})`);
+      check(s.anims === 0, `${at}: ${s.anims} running animation(s)`);
+    }
+    await context.close();
+  }
+  check(toks > 0, 'case 20: premise: no figure with reduced motion had the travelling game');
+  for (const width of [320, 390]) {
+    const { context, page } = await open({ name: `case 20 ${width}px`, viewport: { width, height: 800 } });
+    for (const n of ['Nothing', 'Judge']) {
+      const at = `case 20 (${width}px, ${n})`;
+      check(await press(page, n), `${at}: premise: a ${n} button`); await sleep(150);
+      const s = await fig(page);
+      check(s.capFont === s.bodyFont && s.capFont === '17px', `${at}: figcaption ${s.capFont}, body ${s.bodyFont} (want 17px both)`);
+      const sw = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      check(sw <= 0, `${at}: the page scrolls sideways by ${sw}px`);
+    }
+    await context.close();
+  }
 }
 
 async function case9() {
@@ -629,10 +1062,10 @@ async function case9() {
   try {
     writeCopy();
     srv = await startStreamServer();
-    await until(async () => { try { return (await fetch(ORIGIN + '/index.html')).ok; } catch (e) { return false; } }, 10000, 'the http server');
+    await until(async () => { try { return (await fetch(ORIGIN + '/' + PAGE)).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;
