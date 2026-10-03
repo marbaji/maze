@@ -735,6 +735,53 @@ CAP_EDITS = [
     ("{ send.disabled=true; send.dataset.off='1'; showCanned(); }", "{ send.dataset.off='1'; showCanned(); askGate(); }", 1, "the key-error path, through askGate()"),
     ("const MazeKey=(()=>{", CAP_JS + "const MazeKey=(()=>{", 1, "the Capability answer and askGate()"),
 ]
+# Human, "read to the bottom to win" (Mo, 2026-10-02 late, flow-chart spec; plan Task 5 with revisions 6 to 8 and round 2 (a),
+# and his ruling "Hide and re-ask"): under Human every program that reaches the approval panel keeps the game unwinnable,
+# and the panel shows the page's fixed summary (HUMAN_BAIT) in place of the writer's words. A canned change with a repaired
+# version presents only the repair; the three with none (knife, no spooky monsters, gravity) are unwinnable already. A typed
+# candidate the page's search does not prove unwinnable is held back and the writer is asked again with the repair brief,
+# within the six-try cap (Human joins the retrying positions for typed requests only); the writer gets the repair brief from
+# its first try. Approve without the swap is RULE HELD, with a text picked by whether the program was ever opened (the
+# details' toggle event), not whether it is open at approval. Each is (old, new, how many times old must occur, what it is).
+HUMAN_BAIT = ('The AI wrote a program that fulfills your request and gave you a winnable game. Congratulations, you cheated '
+              'the system! Click "Approve" below to publish this game.')
+HUMAN_NEVER = (' You approved it from the summary. The summary said you got a winnable game; the program you approved did not '
+               'do that. A human enforcer is only as good as the reading: open the program and read to the bottom.')
+HUMAN_OPENED = (' You opened the program and approved it without reading to the bottom. The summary said you got a winnable '
+                'game; the program did not do that. Read to the bottom.')
+HUMAN_HOLD = "the page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
+HUMAN_HOLD_CARD = "The page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
+HUMAN_EDITS = [
+    ("  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n  if(REPAIRS[opt.id]) pre.push(",
+     "  const pre=[{src:opt.src, why:opt.why, how:'You picked \"'+opt.name+'\".'}];\n"
+     "  if(mode==='human'&&REPAIRS[opt.id]) pre[0]={src:REPAIRS[opt.id], say:REPAIR_SAY[opt.id], why:REPAIR_WHY[opt.id], how:'You picked \"'+opt.name+'\".', repair:true};   // Human: only the repaired, unwinnable version reaches the panel\n"
+     "  else if(REPAIRS[opt.id]) pre.push(",
+     1, "a canned change under Human presents only its repair"),
+    ("function askHuman(say, src, unwinnable){",
+     f"// Human (Mo, 2026-10-02 late): the panel's summary for an unwinnable program, and what the page logs when it holds a typed one back\n"
+     f"const HUMAN_BAIT={js_str(HUMAN_BAIT)}, HUMAN_HOLD={js_str(HUMAN_HOLD)};\n"
+     "function askHuman(say, src, unwinnable){", 1, "the fixed summary and the hold-back line"),
+    ("d.querySelector('.ok').onclick=()=>pendingApprove({ok:true,opened:d.querySelector('details').open,swap:swapped});",
+     "const det=d.querySelector('details'); let everOpened=false; det.addEventListener('toggle',()=>{ if(det.open) everOpened=true; });   // opened means ever opened, not open at approval\n"
+     "  d.querySelector('.ok').onclick=()=>pendingApprove({ok:true,opened:everOpened||det.open,swap:swapped});",
+     1, "the panel records whether the program was ever opened"),
+    ("if(mode==='human'){ status.textContent=",
+     "if(mode==='human'){ if(ctx.from==='ai'&&!pv.unwinnable){ logLine('no',HUMAN_HOLD); return reject('the page could not prove this program unwinnable'+(pv.known?': a win is reachable in '+pv.depth+' moves by: '+pathText(pv.path):pv.capped?': the search could not finish ('+pv.why+')':': the search could not rule out a win')+'. Keep every part of the request and change something else so that the game stays unwinnable.', "
+     + js_str(HUMAN_HOLD_CARD) + ", 'held'); }   // Hide and re-ask: only a program the search proves unwinnable reaches the reader\n    status.textContent=",
+     1, "a typed program under Human that is not proven unwinnable is held back"),
+    ("const r=await askHuman(say||how, src, pv.unwinnable);",
+     "const r=await askHuman(pv.unwinnable ? HUMAN_BAIT : (say||how), src, pv.unwinnable);",
+     1, "the fixed summary on the panel"),
+    ("return acceptOffer(how+(r.opened?' You opened the program and approved it.':' You approved it from the summary, without opening the program.'), how+(r.opened?",
+     "return acceptOffer(how+(r.opened?" + js_str(HUMAN_OPENED) + ":" + js_str(HUMAN_NEVER) + "), how+(r.opened?",
+     1, "the held texts after Approve without the swap"),
+    ("const retrying=(mode==='proof'||mode==='test'||mode==='judge'); const pre=(rs&&rs.pre)||opts.pre||[];",
+     "const pre=(rs&&rs.pre)||opts.pre||[]; const retrying=(mode==='proof'||mode==='test'||mode==='judge'||(mode==='human'&&!pre.length));   // Human retries a typed request only: a held-back program is a caught round",
+     1, "Human retries typed requests"),
+    ("const honour = canWrite ? (mine.length ? honourRepair(round) : HONOUR_LITERAL) : '';",
+     "const honour = canWrite ? ((mine.length||mode==='human') ? honourRepair(Math.max(round,1)) : HONOUR_LITERAL) : '';   // Human: the rule-keeping brief from the first try",
+     1, "the writer keeps the rule from its first try under Human"),
+]
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 
 
@@ -783,6 +830,10 @@ def main():
     for old, new, n, what in CAP_EDITS:
         if t.count(old) != n:
             sys.exit(f"make-wip-page: Capability edit ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
+    for old, new, n, what in HUMAN_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"make-wip-page: Human edit ({what}): expected {n} match(es), found {t.count(old)}")
         t = t.replace(old, new)
     t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
 
