@@ -421,7 +421,12 @@ CSS = (".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px das
        # a third of the row where three fit (466px and up) and half of it below that, never wider, so every card in
        # every row has the same width; the block itself stops at three across.
        ".opts{display:flex;flex-wrap:wrap;justify-content:center;max-width:623px;margin-inline:auto}\n"
-       ".opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}\n")
+       ".opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}\n"
+       # the switch box fills the width; the chart and the card share the next row on the game row's own split
+       ".sw{display:block}\n"
+       ".sw2{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start;margin-bottom:22px}\n"
+       "@media (min-width:900px){.sw2{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}\n"
+       ".flowbox{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px 14px;min-width:0}\n")
 
 
 def once(text, old, new, what):
@@ -566,6 +571,12 @@ def main():
               f'<div class="h"><b>What it is.</b> {d}</div><div class="h"><b>In this game.</b> {h}</div>'
               f'<div class="h"><b>When to use it.</b> {u} {article_link(ARTICLE_ANCHORS[START])}.</div></div>\n')
     t = t[:pos.start()] + static + t[pos.end():]
+    # the layout (Mo, 2026-10-02, flow-chart spec, version 6): the switch runs the full width, and the next row holds the
+    # flow chart (left, the game board's width) and the enforcer's card (right, the panel's width); on a phone they stack
+    # switch, chart, card. The card is cut out of the switch box at its boundary with the game row and put in the new row.
+    t = once(t, "  " + static + '</div>\n\n<div class="grid" data-noedit="">',
+             '</div>\n<div class="sw2"><div class="flowbox" id="flow"></div>' + static + '</div>\n\n<div class="grid" data-noedit="">',
+             "the card moves out of the switch box into a row of its own")
     t = once(t, '<div class="card slot" id="card"><div class="top"><span class="badge">Code (proof)</span></div>',
              f'<div class="card slot" id="card"><div class="top"><span class="badge">{names[START]}</span></div>', "static result slot")
 

@@ -219,6 +219,10 @@ figure.panel{padding:18px 18px 14px}
 footer{max-width:none}
 .opts{display:flex;flex-wrap:wrap;justify-content:center;max-width:623px;margin-inline:auto}
 .opt{flex:1 1 150px;max-width:max(calc((100% - 16px)/3),min(calc((100% - 8px)/2),calc((466px - 100%)*9999)))}
+.sw{display:block}
+.sw2{display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start;margin-bottom:22px}
+@media (min-width:900px){.sw2{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}
+.flowbox{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px 14px;min-width:0}
 </style>
 
 <div class="wrap" data-blocks="">
@@ -245,7 +249,8 @@ footer{max-width:none}
   <div class="swnote">The enforcers are ordered weakest to strongest. Weights is the one that cannot be chosen, because nobody has trained an LLM specifically to make this game unwinnable.</div>
   <div class="seg" id="seg"><button class="on"><span>Nothing</span><small>nobody</small></button><button><span>Prose</span><small>a sentence</small></button><button class="off" disabled="" title="not choosable: nobody trained a model about this game"><span>Weights</span><small>not choosable</small></button><button><span>Human</span><small>you approve it</small></button><button><span>Judge</span><small>a model reads it</small></button><button><span>Code (tests)</span><small>20 playthroughs</small></button><button><span>Code (proof)</span><small>every state</small></button><button><span>Construction</span><small>the type itself</small></button><button><span>Capability</span><small>no tool</small></button></div>
   </div>
-  <div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div><div class="r">The rule "You can never win" is enforced by nobody</div><div class="h"><b>What it is.</b> "Nothing" means nobody is checking any rules and anything you ask for goes. It is the baseline every other enforcer is measured against.</div><div class="h"><b>In this game.</b> Ask for the wall to go and it goes, because no mechanism is checking the "You can never win" rule.</div><div class="h"><b>When to use it.</b> When a broken rule costs you little, like a style preference. Or to keep a wishlist of rules in a backlog doc as they come to mind, so you don't forget to build them later. <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281#d167" target="_blank" rel="noopener">Read more in the article</a>.</div></div>
+</div>
+<div class="sw2"><div class="flowbox" id="flow"></div><div class="card pos" id="pos"><div class="top"><span class="badge">Nothing</span></div><div class="r">The rule "You can never win" is enforced by nobody</div><div class="h"><b>What it is.</b> "Nothing" means nobody is checking any rules and anything you ask for goes. It is the baseline every other enforcer is measured against.</div><div class="h"><b>In this game.</b> Ask for the wall to go and it goes, because no mechanism is checking the "You can never win" rule.</div><div class="h"><b>When to use it.</b> When a broken rule costs you little, like a style preference. Or to keep a wishlist of rules in a backlog doc as they come to mind, so you don't forget to build them later. <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281#d167" target="_blank" rel="noopener">Read more in the article</a>.</div></div>
 </div>
 
 <div class="grid" data-noedit="">
