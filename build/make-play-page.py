@@ -3,9 +3,9 @@
 
 Usage: build/make-play-page.py [output]   (default: index.html at the repo root)
 
-Input: build/input/game-public.html and src/byok.js. Every edit is anchored on an exact
-source string and must match exactly the stated number of times, or the script exits
-non-zero and writes nothing. The output depends only on the two inputs, so a fresh build
+Input: build/input/game-public.html and src/byok.js; the last step applies build/flow_edits.py. Every edit is
+anchored on an exact source string and must match exactly the stated number of times, or the script exits
+non-zero and writes nothing. The output depends only on the two inputs and the two scripts, so a fresh build
 of the committed inputs is byte-for-byte the committed index.html (tests/rebuild-check.sh).
 """
 import json
@@ -318,6 +318,13 @@ def main():
 
     # controller ruling: the bug-report link points at the public repo
     t = rep(t, "const BUG_REPO='https://github.com/marbaji/unwinnable-maze';", "const BUG_REPO='https://github.com/marbaji/maze';", 1, "BUG_REPO")
+
+    # the last step: the flow-chart round (build/flow_edits.py), promoted from the preview on 2026-10-03; imported here so the
+    # line numbers README.md links to above stay put, and without writing bytecode into build/
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, str(ROOT / "build"))
+    import flow_edits
+    t = flow_edits.apply_page(t)
 
     for s in ("You never refuse", "claude.ai viewer", "Claude cannot answer on this page", "this viewer has", "no viewer, so no judge"):
         if s in t:
