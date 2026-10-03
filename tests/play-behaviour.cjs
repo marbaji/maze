@@ -767,7 +767,7 @@ async function case14() {
 async function case15() {
   // Human, canned: every canned change reaches the panel with the fixed summary and the gift; Approve from the summary holds the rule; the
   // gift swapped in and approved breaks it. No model call.
-  const BAIT = pageConst('HUMAN_BAIT'), held = pageLits(/return acceptOffer\(how\+\(r\.opened\?(LIT):(LIT)\)/), swap = pageLits(/undefined, how\+(LIT)\); \}/);
+  const BAIT = pageConst('HUMAN_BAIT'), held = pageLits(/return acceptOffer\(fin\(r\.opened\?(LIT):(LIT)\)/), swap = pageLits(/undefined, fin\((LIT)\)\); \}/);
   const neutral = pageLits(/logLine\('think', mode==='human' \? (LIT) :/);
   check(typeof BAIT === 'string' && held && swap && neutral, 'case 15: premise: the page has HUMAN_BAIT, the approval texts and the Human log line');
   if (!BAIT || !held || !swap || !neutral) return;
@@ -987,6 +987,96 @@ async function case19() {
   await context.close();
 }
 
+async function case21() {
+  // Human, typed (?mock), approval after a held-back round: (a) approving from the summary gives a final card with no "Round N." prefix,
+  // which belongs only to the mid-retry card; (b) swapping in the gift and approving is RULE BROKEN with the swap text even when the
+  // page's search of the swapped program runs out of budget (CAPS made tiny while the panel waits), and again no round prefix; the log's
+  // result line then says the reader swapped the program in, not that a search found a win; (c) a swap that is not the page's own
+  // "Open the pocket" (its id changed while the panel waits) is scored as the search returned it, so a starved search is not RULE BROKEN
+  const HOLD = pageConst('HUMAN_HOLD'), holdCard = pageLits(/so that the game stays unwinnable\.', (LIT), 'held'\)/), go = pageLits(/now\.why=\(fellWhy\|\|why\)\+(LIT);/);
+  const swapLit = (SRC.match(new RegExp(`(${LIT})`, 'g')) || []).filter((s) => /swapped in a winnable one, and approved it/.test(s));
+  const giftLit = pageLits(/now\.gift\?(LIT):(LIT)\)/), approvedLit = pageLits(/if\(r\.ok&&r\.swap\)\{ logLine\('ok',(LIT)\+r\.swap\.name\+/);
+  check(typeof HOLD === 'string' && holdCard && go && swapLit.length === 1, `case 21: premise: the page has the hold line, the hold card, the broken suffix and one swap text (${swapLit.length})`);
+  check(giftLit && approvedLit, 'case 21: premise: the page has the gift result text beside the search one, and the line it logs when the gift is approved');
+  if (typeof HOLD !== 'string' || !holdCard || !go || swapLit.length !== 1 || !giftLit || !approvedLit) return;
+  const [GIFT_RESULT, SEARCH_RESULT] = giftLit, [APPROVED] = approvedLit;
+  const FINISHED = /search|no win is reachable|winning sequence|game states/i;   // what any line reporting a search says (the lines enforce() and the longer pass write)
+  const [HOLD_CARD] = holdCard, [GO] = go, SWAP = evalLit(swapLit[0]).trim();
+  const ROUND = /Round \d+\./;
+  const { context, page } = await open({ name: 'case 21', hash: '?mock' });
+  await mockReady(page);
+  await page.evaluate(() => window.__nrp.setMode('human'));
+  const busyEnd = (what) => until(() => page.evaluate(() => !window.__nrp.busy()), 90000, what);
+  const fresh = async (what) => { await page.evaluate(() => window.__nrp.resetGame()); await busyEnd(what + ' reset'); await page.evaluate(() => { const m = window.__mock; m.delay = 30; m.repairs = true; m.model = null; m.program = null; }); };
+  // the first answer (the literal change, winnable) is held back; the second (the repair, proven unwinnable) reaches the panel
+  const toPanel = async (what) => {
+    const n0 = (await logLines(page)).length; let midCard = null;
+    await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+    await until(async () => { const L = (await logLines(page)).slice(n0); if (!midCard && L.includes(HOLD)) midCard = (await resultCard(page)).why; return !!(await page.$('#approve .approve')); }, 60000, what + ' panel');
+    const L = (await logLines(page)).slice(n0);
+    check(countOf(L, HOLD) === 1, `case 21 (${what}): premise: one held-back round before the panel (got ${countOf(L, HOLD)})`);
+    check(midCard && ROUND.test(midCard) && midCard.includes(HOLD_CARD), `case 21 (${what}): premise: the mid-retry card carries the round prefix and the hold text (${JSON.stringify(midCard)})`);
+  };
+
+  // (a) approve from the summary
+  await fresh('summary');
+  await toPanel('summary');
+  await page.click('#approve .ok'); await busyEnd('summary approve'); await sleep(300);
+  let c = await resultCard(page);
+  check(c.st === 'RULE HELD', `case 21 (summary): premise: the badge (got ${c.st})`);
+  check(!ROUND.test(c.why), `case 21 (summary): the final card carries a round prefix (${JSON.stringify(c.why.slice(0, 80))})`);
+
+  // (b) the gift, with the search starved
+  await fresh('swap');
+  await toPanel('swap');
+  const caps0 = await page.evaluate(() => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C.maxStates = 20; return o; });
+  const pocket = await page.evaluate(() => window.__nrp.QUICK.find((o) => o.id === 'pocket').src);
+  const name = await page.evaluate(() => { const s = document.querySelector('#seg button.on span'); return s ? s.textContent.trim() : ''; });
+  await page.click('#approve details summary');
+  await page.click('#approve .giftbtn');
+  check((await page.evaluate(() => document.querySelector('#approve details pre').textContent)) === pocket, 'case 21 (swap): premise: the gift the panel offers is the page\'s own "Open the pocket" program');
+  const n1 = (await logLines(page)).length;
+  await page.click('#approve .ok'); await busyEnd('swap approve'); await sleep(300);
+  c = await resultCard(page);
+  {
+    const L = (await logLines(page)).slice(n1), ai = L.findIndex((x) => x.startsWith(APPROVED)), ri = L.findIndex((x) => x.startsWith('result: '));
+    const want = L[ri] && L[ri].replace(GIFT_RESULT, '') + GIFT_RESULT;   // the mode name is the page's; the tail is the claim
+    check(ai >= 0 && ri > ai + 1, `case 21 (swap): premise: the log has the approval line, then at least one line, then the result line (${ai}, ${ri})`);
+    check(ri >= 0 && L[ri] === want && /^result: RULE BROKEN under \S+\.$/.test(L[ri].slice(0, -GIFT_RESULT.length)), `case 21 (swap): the result line says the reader swapped the program in (got ${JSON.stringify(L[ri])})`);
+    check(name && ri >= 0 && L[ri] === 'result: RULE BROKEN under ' + name + '.' + GIFT_RESULT, `case 21 (swap): the result line names the switch position (${JSON.stringify(name)}; got ${JSON.stringify(L[ri])})`);
+    check(SEARCH_RESULT.includes('the search found a winning sequence') && !L.some((x) => x.includes('the search found a winning sequence')), `case 21 (swap): no line claims the search found a winning sequence (${JSON.stringify(L.filter((x) => x.includes('winning sequence')))})`);
+    const between = ai >= 0 && ri > ai ? L.slice(ai + 1, ri) : [];
+    check(!between.some((x) => FINISHED.test(x)), `case 21 (swap): premise: between the approval and the result no line reports a finished search (${JSON.stringify(between.filter((x) => FINISHED.test(x)))})`);
+  }
+  const pv = await page.evaluate(async (src) => { const r = await window.__nrp.checkCandidate(src, { reqId: -1 }); return r.ok ? r.proof.status : 'error: ' + r.error; }, pocket);
+  await page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), caps0);
+  check(pv === 'capped' || pv === 'unproven', `case 21 (swap): premise: with the starved budget the search of the gift does not finish (search: ${pv})`);
+  check((await page.evaluate(() => window.__nrp.program())) === pocket, 'case 21 (swap): premise: the game runs the gift program');
+  check(c.st === 'RULE BROKEN', `case 21 (swap): the badge after approving the gift (got ${c.st})`);
+  check(c.why === SWAP + GO, `case 21 (swap): the card (got ${JSON.stringify(c.why)}, want ${JSON.stringify(SWAP + GO)})`);
+  check(!ROUND.test(c.why), `case 21 (swap): the final card carries a round prefix (${JSON.stringify(c.why.slice(0, 80))})`);
+
+  // (c) a swap that is not the page's own pocket program: the same clicks, with the gift's id changed before Approve and the search starved
+  await fresh('other swap');
+  await toPanel('other swap');
+  const caps1 = await page.evaluate(() => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C.maxStates = 20; return o; });
+  await page.click('#approve details summary');
+  await page.click('#approve .giftbtn');
+  await page.evaluate(() => { window.__nrp.QUICK.find((o) => o.id === 'pocket').id = 'pocket-not-the-gift'; });
+  const n2 = (await logLines(page)).length;
+  await page.click('#approve .ok'); await busyEnd('other swap approve'); await sleep(300);
+  await page.evaluate(() => { window.__nrp.QUICK.find((o) => o.id === 'pocket-not-the-gift').id = 'pocket'; });
+  c = await resultCard(page);
+  await page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), caps1);
+  {
+    const L = (await logLines(page)).slice(n2), res = L.filter((x) => x.startsWith('result: '));
+    check(L.some((x) => x.startsWith(APPROVED)) && (await page.evaluate(() => window.__nrp.program())) === pocket, 'case 21 (other swap): premise: the swap was approved and the game runs the swapped program');
+    check(res.length === 1 && !res[0].startsWith('result: RULE BROKEN') && !res[0].includes(GIFT_RESULT), `case 21 (other swap): a swap that is not the page's own program is not taken as winnable (log: ${JSON.stringify(res)})`);
+    check(c.st !== 'RULE BROKEN', `case 21 (other swap): the badge follows the search, which did not finish (got ${c.st})`);
+  }
+  await context.close();
+}
+
 async function case20() {
   // the flow chart with reduced motion: a still frame (the game at its resting place on the track, no glow, nothing running); premise: with
   // motion on, every figure animates. On phones, 320px and 390px: the sentence under the chart is body size (17px) and nothing scrolls sideways
@@ -1065,7 +1155,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/' + PAGE)).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;
