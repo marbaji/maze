@@ -34,8 +34,10 @@ WIPNOTE = ('  <p class="wipnote">Work-in-progress preview. The live game is <a h
 # the note sits at the top of the article, before the intro's first paragraph
 WIPNOTE_BEFORE = "  <p>We've all been there."
 WIPNOTE_CSS = ".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
-# the note's style goes just before this line of the flow-chart round's in the page's stylesheet
-WIPNOTE_CSS_BEFORE = ".card.pos .h+.h{margin-top:8px}\n"
+# the note's style goes just before this line of the page's stylesheet. The line is the base stylesheet's own last rule
+# (build/input/game-public.html; make-play-page.py puts the key box's styles after it), not one build/flow_edits.py writes,
+# so a change there cannot move or remove it; a miss still stops this script (once(), below)
+WIPNOTE_CSS_BEFORE = "@media (prefers-reduced-motion:reduce){.jdg .clip,.verdict{animation:none;opacity:1;transform:none}}\n"
 
 
 def once(text, old, new, what):
