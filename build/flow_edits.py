@@ -89,6 +89,19 @@ INTRO_NEW = (
     '  <p>I coded a game as a fun way to learn them. If you want to read the definition of each enforcer and when to '
     f'use it, <a href="{POST_URL}">I also wrote the article</a>.</p>\n')
 
+# A bordered box in the intro, above the game, about a tool Mo may release (Mo, 2026-10-03: "probably we should mention
+# the 'If there's enough interest in this,' in like a bordered box or indented box inside the intro narrative somewhere
+# in the /maze artifact so ppl who land there can find it"; previewed on wip.html, approved for the live page 2026-10-04:
+# "Yes, move the if enough interest box to live page"). The words are his, verbatim. SOON_TEXT stays one plain
+# double-quoted line: tests/play-page-check.cjs reads it from this file and compares the page's box with it.
+SOON_TEXT = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time."
+SOON = f'  <p class="soon">{html.escape(SOON_TEXT, quote=False)}</p>\n'
+# the box sits directly after the intro's last paragraph, the one that ends with the link to the article, before the
+# game's heading
+SOON_AFTER = "I also wrote the article</a>.</p>\n"
+# a quiet box in the page's own colours (they switch with light and dark); the text keeps the article's body type
+SOON_CSS = ".read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card)}\n"
+
 HEAD_OLD = '<h2 id="read-play">Now try to break the game&nbsp;</h2>'
 HEAD_NEW = '<h2 id="read-play">The Unwinnable Maze</h2>'
 
@@ -386,7 +399,8 @@ COPY_EDITS = [
 # the switch keeps its labels (Mo, 2026-10-02).
 BY = {"human": "your approval", "judge": "a second model that reads the program"}
 
-CSS = (".card.pos .h+.h{margin-top:8px}\n"
+CSS = (SOON_CSS +
+       ".card.pos .h+.h{margin-top:8px}\n"
        # the long title uses the whole reading column (the live page caps its three-word title at 14ch)
        ".read h1{max-width:none}\n"
        # the ladder: the last line is pushed to the column's right edge; the two in between start a third and two thirds
@@ -820,6 +834,7 @@ def apply_page(t):
     if len(INTRO_OLD_RE.findall(t)) != 1:
         sys.exit("flow_edits: intro: expected 1 match")
     t = INTRO_OLD_RE.sub(lambda m: INTRO_NEW, t)
+    t = once(t, SOON_AFTER, SOON_AFTER + SOON, "box about the tool")
     if len(TITLE_LINES) != 4 or TITLE_LINES[-1] != LADDER_MEASURED_FOR:
         sys.exit("flow_edits: the title's lines changed; measure the last line's width in em in the title's type and update LADDER_LAST_EM and LADDER_MEASURED_FOR (the CSS places four lines)")
     t = once(t, TITLE_OLD, TITLE_NEW, "title")
