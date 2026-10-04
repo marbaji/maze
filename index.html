@@ -207,7 +207,10 @@ figure.panel{padding:18px 18px 14px}
 .keybox summary{cursor:pointer;color:var(--teal);font-weight:600;padding:10px 0}
 .keybox ol{margin:4px 0 8px;padding-left:20px}
 .keybox details p{margin:0}
-.read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card)}
+.read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card);margin:0 0 1em}
+.read .soon p{margin:0 0 .5em}
+.read .soon ul{margin:0;padding-left:1.25em}
+.read .soon li+li{margin-top:.3em}
 .card.pos .h+.h{margin-top:8px}
 .read h1{max-width:none}
 .read h1.lad{text-wrap:nowrap;--last:4.78em}
@@ -318,7 +321,7 @@ footer{max-width:none}
   <p>We've all been there. You wrote a thoughtful prompt or skill file, incredibly detailed and organized, but the AI skipped an important step or didn't give you <i>exactly</i> what you were looking for. You even included the iconic "MAKE NO MISTAKES" in all caps with not one, not two, but <b><i>three </i></b>exclamation marks. Yet alas, mistakes were made. This same problem could arise in agentic workflows or packaged products as well. If you know what you want, how do you make sure the AI actually does it?</p>
   <p>It turns out it has little to do with how you phrase your ask, and a lot to do with what enforces it. An enforcer is the mechanism outside the model that makes sure the instruction or rule you give it is followed, and through my work I was able to bucket them into exactly 8 categories. Building them has become incredibly easy with AI, but you still have to understand the 8 enforcers and when to use each.</p>
   <p>I coded a game as a fun way to learn them. For the definition of each enforcer and when to use it, <a href="https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281">I also wrote the article</a>.</p>
-  <p class="soon">If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time.</p>
+  <div class="soon"><p>If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. What this does is ensure that every step you write in your skill file will actually happen every single time you run it, without adding any rules of its own. This is especially helpful when:</p><ul><li>The skill runs overnight or on a schedule, where a skipped step isn't noticed until the damage is done.</li><li>A step in the skill can't be undone. Sending, publishing, deleting, paying.</li><li>Other people run it. A teammate who didn't write the skill can't tell what it skipped.</li><li>The skill runs many times. A step skipped one time in twenty is a near certainty over a hundred runs.</li></ul></div>
 
   <h2 id="read-play">The Unwinnable Maze</h2>
   <p>You're a round chomper trying to eat all the pellets in a maze while running away from the spooky monsters. The problem is that one pellet starts boxed in with walls on all four sides, so you can't reach it. The game has a chat box where you can ask for anything you want and watch it materialize (or become anything). The game has one rule and one rule only:</p>

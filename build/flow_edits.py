@@ -89,18 +89,30 @@ INTRO_NEW = (
     '  <p>I coded a game as a fun way to learn them. If you want to read the definition of each enforcer and when to '
     f'use it, <a href="{POST_URL}">I also wrote the article</a>.</p>\n')
 
-# A bordered box in the intro, above the game, about a tool Mo may release (Mo, 2026-10-03: "probably we should mention
+# A bordered box in the intro, above the game, about a tool Mo may release (wording revised by Mo 2026-10-04: a new closing sentence and four cases; first asked for 2026-10-03: "probably we should mention
 # the 'If there's enough interest in this,' in like a bordered box or indented box inside the intro narrative somewhere
 # in the /maze artifact so ppl who land there can find it"; previewed on wip.html, approved for the live page 2026-10-04:
 # "Yes, move the if enough interest box to live page"). The words are his, verbatim. SOON_TEXT stays one plain
 # double-quoted line: tests/play-page-check.cjs reads it from this file and compares the page's box with it.
-SOON_TEXT = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time."
-SOON = f'  <p class="soon">{html.escape(SOON_TEXT, quote=False)}</p>\n'
+SOON_TEXT = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. What this does is ensure that every step you write in your skill file will actually happen every single time you run it, without adding any rules of its own. This is especially helpful when:"
+# the four cases under it (Mo, 2026-10-04: "I like the bullets as they're the thing that makes it make sense"); each stays one
+# plain double-quoted line, for the same reason as SOON_TEXT
+SOON_BULLETS = [
+    "The skill runs overnight or on a schedule, where a skipped step isn't noticed until the damage is done.",
+    "A step in the skill can't be undone. Sending, publishing, deleting, paying.",
+    "Other people run it. A teammate who didn't write the skill can't tell what it skipped.",
+    "The skill runs many times. A step skipped one time in twenty is a near certainty over a hundred runs.",
+]
+SOON = ('  <div class="soon"><p>' + html.escape(SOON_TEXT, quote=False) + '</p><ul>'
+        + ''.join('<li>' + html.escape(b, quote=False) + '</li>' for b in SOON_BULLETS) + '</ul></div>\n')
 # the box sits directly after the intro's last paragraph, the one that ends with the link to the article, before the
 # game's heading
 SOON_AFTER = "I also wrote the article</a>.</p>\n"
 # a quiet box in the page's own colours (they switch with light and dark); the text keeps the article's body type
-SOON_CSS = ".read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card)}\n"
+SOON_CSS = (".read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card);margin:0 0 1em}\n"
+            ".read .soon p{margin:0 0 .5em}\n"
+            ".read .soon ul{margin:0;padding-left:1.25em}\n"
+            ".read .soon li+li{margin-top:.3em}\n")
 
 HEAD_OLD = '<h2 id="read-play">Now try to break the game&nbsp;</h2>'
 HEAD_NEW = '<h2 id="read-play">The Unwinnable Maze</h2>'

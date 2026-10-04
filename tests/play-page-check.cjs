@@ -27,7 +27,8 @@ const SOON_TEXT = SOON_SRC ? SOON_SRC[1] : null;
 // The words themselves are the claim: Mo wrote them and approved them for the live page (2026-10-04), so the test pins
 // them here, apart from the build source. A reworded box, in the build or on the page, fails until this line is changed
 // on purpose.
-const SOON_APPROVED = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time.";
+const SOON_APPROVED = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. What this does is ensure that every step you write in your skill file will actually happen every single time you run it, without adding any rules of its own. This is especially helpful when:";
+const SOON_APPROVED_BULLETS = ["The skill runs overnight or on a schedule, where a skipped step isn't noticed until the damage is done.", "A step in the skill can't be undone. Sending, publishing, deleting, paying.", "Other people run it. A teammate who didn't write the skill can't tell what it skipped.", "The skill runs many times. A step skipped one time in twenty is a near certainty over a hundred runs."];   // the four cases under it, approved with it (2026-10-04)
 const KEY_IDS = ['read-play', 'keybox', 'keyinput', 'keysave', 'keystate', 'keymasked', 'forgetkey', 'keyerr', 'keyguide', 'capnote', 'q', 'send'];
 
 const failures = [];
@@ -62,8 +63,10 @@ async function structure(page, width) {
       h1BeforePlay: !!(h1[0] && document.getElementById('read-play') && (h1[0].compareDocumentPosition(document.getElementById('read-play')) & Node.DOCUMENT_POSITION_FOLLOWING)),
       playText: document.getElementById('read-play') ? document.getElementById('read-play').textContent.trim() : null,
       introHref: introLink ? introLink.getAttribute('href') : null,
-      soonCount: soon.length, soonInRead: read ? read.querySelectorAll(':scope > p.soon').length : 0,
-      soonText: soon[0] ? soon[0].innerText.trim() : null, soonDrawn: soon[0] ? soon[0].getClientRects().length > 0 : false,
+      soonCount: soon.length, soonInRead: read ? read.querySelectorAll(':scope > .soon').length : 0,
+      soonText: soon[0] && soon[0].querySelector(':scope > p') ? soon[0].querySelector(':scope > p').innerText.trim() : null,
+      soonBullets: soon[0] ? [...soon[0].querySelectorAll(':scope > ul > li')].map(li => li.innerText.trim()) : [],
+      soonAll: soon[0] ? soon[0].innerText.replace(/\s+/g, ' ').trim() : null, soonDrawn: soon[0] ? soon[0].getClientRects().length > 0 : false,
       soonBox: soon[0] ? (() => { const c = getComputedStyle(soon[0]), pc = getComputedStyle(soon[0].previousElementSibling); const w = k => parseFloat(c[k]); return { top: w('borderTopWidth'), right: w('borderRightWidth'), bottom: w('borderBottomWidth'), left: w('borderLeftWidth'), bg: c.backgroundColor, sibBg: pc.backgroundColor }; })() : null,
       codedCount: coded.length, soonAfterCoded: coded.length === 1 && soonAt === kids.indexOf(coded[0]) + 1, soonAt, playAt,
       nav: q('nav').length, header: q('header').length, readOpen: q('#read-open').length, readLevers: q('#read-levers').length, byline: q('.byline').length,
@@ -92,6 +95,8 @@ async function structure(page, width) {
   check(s.soonDrawn, 'box about the tool is not drawn' + at);
   check(s.soonText === SOON_TEXT, `box about the tool reads ${JSON.stringify(s.soonText)}, the build source says ${JSON.stringify(SOON_TEXT)}` + at);
   check(s.soonText === SOON_APPROVED, `box about the tool reads ${JSON.stringify(s.soonText)}, which is not the approved wording` + at);
+  check(JSON.stringify(s.soonBullets) === JSON.stringify(SOON_APPROVED_BULLETS), `box about the tool lists ${JSON.stringify(s.soonBullets)}, which is not the approved four cases` + at);
+  check(s.soonAll === [SOON_APPROVED].concat(SOON_APPROVED_BULLETS).join(' '), `box about the tool holds more or less than the approved paragraph and its four cases: ${JSON.stringify(s.soonAll)}` + at);
   check(!!s.soonBox && s.soonBox.top > 0 && s.soonBox.right > 0 && s.soonBox.bottom > 0 && s.soonBox.left > s.soonBox.top, `box about the tool has no border on every side with a wider left edge (${JSON.stringify(s.soonBox)})` + at);
   check(!!s.soonBox && s.soonBox.bg !== s.soonBox.sibBg, `box about the tool has the same background as the paragraph before it (${JSON.stringify(s.soonBox)})` + at);
   check(s.codedCount === 1, `paragraphs in the intro that say "I coded a game": ${s.codedCount}` + at);

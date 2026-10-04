@@ -58,7 +58,7 @@ def main():
     if 'class="wipnote"' in art:
         sys.exit("make-wip-page: index.html already holds the preview note")
     # a line break or the end of a block separates words; an inline tag does not ("</a>." is one word with its link text)
-    art = re.sub(r"<br>|</(?:p|h1|h2)>", " ", art)
+    art = re.sub(r"<br>|</(?:p|h1|h2|li)>", " ", art)
     words = len(html.unescape(re.sub(r"<[^>]+>", "", art)).split())
 
     # the preview's markers
