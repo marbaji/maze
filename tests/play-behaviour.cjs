@@ -54,7 +54,6 @@ const ERR = {
 const PROGRAM = "const ACTIONS = ['up', 'down', 'left', 'right'];\nconst PELLETS0 = [];\nfunction init() { return { x: 0, y: 0, keys: 0 }; }\nfunction step(s, a) { const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[a]; const nx = s.x + d[0], ny = s.y + d[1]; if (nx < 0 || ny < 0 || nx > 4 || ny > 4) return null; return { ...s, x: nx, y: ny }; }\nfunction goal(s) { return s.keys >= 3; }\nfunction render(s) { const cells = []; cells[cells.length] = { x: 3, y: 3, k: 'door', color: '#8a5' }; cells[cells.length] = { x: s.x, y: s.y, k: 'player' }; return { w: 5, h: 5, cells, hud: 'keys ' + s.keys, goal: 'find three keys' }; }";
 const WRITER_TEXT = 'SAY: Made a small five by five game with a door.\nWHY: Nothing ever raises the key count, so the goal never holds.\nPROGRAM:\n' + PROGRAM;
 const JUDGE_TEXT = '{"winnable": false, "reason": "nothing raises the key count"}';
-const GATE_TEXT = '{"apply": true, "say": "Applied as asked."}';
 
 // ---- Anthropic's streaming format
 const ev = (name, obj) => `event: ${name}\ndata: ${JSON.stringify(obj)}\n\n`;
@@ -67,8 +66,8 @@ const sseEnd = ev('content_block_stop', { type: 'content_block_stop', index: 0 }
   ev('message_stop', { type: 'message_stop' });
 const sse = (text, model) => sseStartAs(model) + sseDelta(text.slice(0, 20)) + sseDelta(text.slice(20)) + sseEnd;
 const MODEL_LINE = /was answered by /;
-const kindOf = (body) => { const c = (((body || {}).messages || [])[0] || {}).content || ''; return /You are a referee/.test(c) ? 'judge' : /ready-made change/.test(c) ? 'gate' : 'writer'; };
-const OK_ANSWER = { writer: WRITER_TEXT, judge: JUDGE_TEXT, gate: GATE_TEXT };
+const kindOf = (body) => { const c = (((body || {}).messages || [])[0] || {}).content || ''; return /You are a referee/.test(c) ? 'judge' : 'writer'; };
+const OK_ANSWER = { writer: WRITER_TEXT, judge: JUDGE_TEXT };
 
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); return ok; };
@@ -82,7 +81,7 @@ async function until(fn, ms, what) {
 const allRequests = [];
 // ---- the Anthropic calls the route answered, and the calls the streaming server saw
 let routed = [];
-const stream = { reqs: [], plan: { writer: [], judge: [], gate: [] } };
+const stream = { reqs: [], plan: { writer: [], judge: [] } };
 
 function startStreamServer() {
   const cors = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type, x-api-key, anthropic-version, anthropic-dangerous-direct-browser-access, anthropic-beta' };
@@ -355,7 +354,7 @@ async function case7() {
   for (const [mode, how, kind] of stages) {
     for (const action of ['stop', 'forget']) {
       const at = `case 7 (${action} during the ${kind} call)`;
-      stream.reqs = []; stream.plan = { writer: [], judge: [], gate: [] }; stream.plan[kind] = [{ how: 'hold' }];
+      stream.reqs = []; stream.plan = { writer: [], judge: [] }; stream.plan[kind] = [{ how: 'hold' }];
       const { context, page, failed, consoleErrors } = await open({ copy: true, name: at });
       await saveKey(page, KEY);
       await setMode(page, mode);
@@ -384,7 +383,7 @@ async function case7() {
   // a timeout aborts the judge's call and it retries exactly once; it is not a Stop
   {
     const at = 'case 7 (Judge timeout)';
-    stream.reqs = []; stream.plan = { writer: [], judge: [{ how: 'hang' }, { how: 'ok' }], gate: [] };
+    stream.reqs = []; stream.plan = { writer: [], judge: [{ how: 'hang' }, { how: 'ok' }] };
     const { context, page, failed } = await open({ copy: true, name: at });
     await saveKey(page, KEY);
     await setMode(page, 'Judge');
@@ -1165,15 +1164,23 @@ async function case22() {
 }
 
 async function case23() {
-  // the round label: a typed request's card opens with "Round N." only while the request is still being retried. The card it ends on has
-  // none, under switches that ask once (Nothing, Prose, Construction: an accepted game, and a game that did not run) and under switches
-  // that retry (Code (proof), Judge: the first answer is rejected and its card carries the label; the second is accepted and its card
-  // does not). Premises: the label was made (the copied log names each tried game by it), and each run made the calls it should
+  // the round label: a typed request's card opens with "Round N." only while another try of the request is still to come. The card it ends
+  // on has none, under switches that ask once (Nothing, Prose, Construction: an accepted game, and a game that did not run) and under
+  // switches that retry (Code (proof), Code (tests), Judge: the first answer is rejected and its card carries the label; the second is
+  // accepted and its card does not). The rule is one line in enforce() and is entered from several places, so two more ways in are run:
+  // a canned pick whose own game and repaired version are both rejected, after which the AI writer is asked (the pick's cards keep "You
+  // picked", the AI rounds' cards follow the rule), and a typed request under Code (proof) that pauses on the offer to search longer
+  // (paused with another try pending, the card keeps its label; resumed and proven, the card it ends on has none).
+  // Premises: the label was made (the copied log names each tried game by it), and each run made the calls and rejections it should
   const ROUND = /Round \d+\./;
   const norun = pageLits(/'\. Fix that first\.', (LIT)\+chk\.error\+'\.', 'failed'\)/), rewriting = pageLits(/'round '\+label\+(LIT)\)/);
+  const testsRej = pageLits(/if\(t\.wins>0\)\{ logLine\('no',(LIT)\+t\.wins\+/), cappedLog = pageLits(/if\(pv\.capped\)\{ logLine\('no',(LIT)\+pv\.why\+/);
+  const cappedCard = pageLits(/the game more constrained\.', (LIT)\+pv\.explored\.toLocaleString\(\)/), proofCard = pageLits(/return accept\(src, how\+(LIT)\+pv\.explored\.toLocaleString\(\)/);
+  const picked = pageLits(/const pre=\[\{src:opt\.src, why:opt\.why, how:(LIT)\+opt\.name\+(LIT)\}\];/), longerLog = pageLits(/function longerStart\(L\)\{ const e=L\.est; return (LIT)\+/);
   check(norun && rewriting, 'case 23: premise: the page has the did-not-run card and the line it logs when a later try starts');
-  if (!norun || !rewriting) return;
-  const [NORUN_CARD] = norun, [REWRITING] = rewriting;
+  check(testsRej && cappedLog && cappedCard && proofCard && picked && longerLog, 'case 23: premise: the page has the line it logs when the playthroughs win, the line and the card for a search that could not finish, the card of a proven game, the opening words of a canned pick\'s card, and the line a longer search starts with');
+  if (!norun || !rewriting || !testsRej || !cappedLog || !cappedCard || !proofCard || !picked || !longerLog) return;
+  const [NORUN_CARD] = norun, [REWRITING] = rewriting, [TESTS_REJ] = testsRej, [CAPPED_LOG] = cappedLog, [CAPPED_CARD] = cappedCard, [PROOF_CARD] = proofCard, [PICK_A, PICK_B] = picked, [LONGER_LOG] = longerLog;
   const { context, page } = await open({ name: 'case 23', hash: '?mock' });
   await mockReady(page);
   const busyEnd = (what) => until(() => page.evaluate(() => !window.__nrp.busy()), 90000, what);
@@ -1183,6 +1190,15 @@ async function case23() {
     await page.evaluate((m) => { const k = window.__mock; k.delay = 30; k.repairs = true; k.model = null; k.program = null; k.judge = 'unwinnable'; k.judgeQueue = null; document.getElementById('clearlog').click(); window.__nrp.setMode(m); }, mode); };
   let seenText = '';
   const note = async () => { seenText += '\n' + await page.evaluate(() => document.body.innerText); };
+  // the stand-in AI writer with its answers held: each call waits until the test lets it go, so the card on screen while answer n is
+  // awaited is read with nothing racing it. The answers are the page's own: the literal "Open the pocket" (winnable) and its repair
+  const texts = await page.evaluate(() => { const n = window.__nrp, q = n.QUICK.find((o) => o.id === 'pocket');
+    return { name: q.name, literal: 'SAY: Mock: rewrote the program as asked.\nWHY: ' + q.why + '\nPROGRAM:\n' + q.src, repair: 'SAY: ' + n.REPAIR_SAY.pocket + '\nWHY: ' + n.REPAIR_WHY.pocket + '\nPROGRAM:\n' + n.REPAIRS.pocket, repairSrc: n.REPAIRS.pocket }; });
+  const hold = (answers) => page.evaluate((a) => { const h = window.__hold = { asked: 0, go: [] }; window.__mock.model = () => new Promise((res) => { const i = h.asked++; h.go.push(() => res(a[Math.min(i, a.length - 1)])); }); }, answers);
+  const asked = (n, what) => page.waitForFunction((n) => window.__hold.asked === n && window.__hold.go.length === 1, n, { timeout: 120000 }).catch((e) => { throw new Error('timed out waiting for ' + what + ' (' + String(e && e.message).split('\n')[0] + ')'); });
+  const letGo = () => page.evaluate(() => { window.__hold.go.shift()(); });
+  const starve = (knob, v) => page.evaluate(([k, v]) => { const C = window.__nrp.CAPS, o = { maxStates: C.maxStates, maxMs: C.maxMs }; C[k] = v; return o; }, [knob, v]);
+  const unstarve = (o) => page.evaluate((o) => Object.assign(window.__nrp.CAPS, o), o);
 
   // switches that ask once: the card the request ends on
   for (const mode of ['nothing', 'prose', 'construction']) {
@@ -1203,26 +1219,90 @@ async function case23() {
     }
   }
 
-  // switches that retry: the rejected first answer's card carries the label while the second try runs; the accepted second answer's does not
-  for (const mode of ['proof', 'judge']) {
+  // switches that retry: the rejected first answer's card carries the label while the second try is awaited; the accepted second answer's
+  // does not. Under Code (tests) the first answer is rejected because playthroughs of it won
+  for (const mode of ['proof', 'test', 'judge']) {
     const at = `case 23 (${mode}, retried)`;
     await fresh(mode, at);
-    await page.evaluate((m) => { window.__mock.delay = 500; if (m === 'judge') window.__mock.judgeQueue = ['winnable', 'unwinnable']; }, mode);
-    const w0 = await writes(); let mid = null;
+    await page.evaluate((m) => { if (m === 'judge') window.__mock.judgeQueue = ['winnable', 'unwinnable']; }, mode);
+    await hold([texts.literal, texts.repair]);
+    const w0 = await writes();
     await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
-    await until(async () => {
-      const s = await page.evaluate((R) => ({ busy: window.__nrp.busy(), second: [...document.querySelectorAll('#log .l')].some((d) => /^round 2 of \d+/.test(d.textContent) && d.textContent.endsWith(R)), done: [...document.querySelectorAll('#log .l')].some((d) => /^result: /.test(d.textContent)) }), REWRITING);
-      if (!mid && s.busy && s.second && !s.done) mid = (await resultCard(page)).why;
-      return !s.busy && s.done;
-    }, 120000, at);
-    await sleep(200);
+    await asked(1, at + ': the first writer call'); await letGo();
+    await asked(2, at + ': the second writer call');
+    const mid = (await resultCard(page)).why, midLog = await logLines(page);
+    check(midLog.some((x) => /^round 2 of \d+/.test(x) && x.endsWith(REWRITING)) && !midLog.some((x) => /^result: /.test(x)) && (await page.evaluate(() => window.__nrp.busy())), `${at}: premise: the card was read while the second try was awaited: the log says round 2 started, no result yet, the request still running`);
+    if (mode === 'test') check(midLog.some((x) => x.startsWith(TESTS_REJ)), `${at}: premise: the first answer was rejected because playthroughs won (${JSON.stringify(midLog.slice(-4))})`);
+    await letGo(); await busyEnd(at); await sleep(200);
     const c = await resultCard(page), t = await tried();
     await note();
     check((await writes()) - w0 === 2, `${at}: premise: two writer calls, the rejected one and the accepted one (got ${(await writes()) - w0})`);
     check(t.length === 2 && t.every((x) => ROUND.test(x)), `${at}: premise: the copied log names both games by their round labels (${JSON.stringify(t)})`);
-    check(typeof mid === 'string' && /^Round 1\. \S/.test(mid), `${at}: the card of the rejected first try, while the second runs, opens with its round label (${JSON.stringify(mid)})`);
+    check(typeof mid === 'string' && /^Round 1\. \S/.test(mid), `${at}: the card of the rejected first try, while the second is awaited, opens with its round label (${JSON.stringify(mid)})`);
     check(c.st === 'RULE HELD' && c.why.length > 0, `${at}: premise: the second answer was accepted (${c.st}: ${JSON.stringify(c.why.slice(0, 80))})`);
     check(!ROUND.test(c.why), `${at}: the final card carries a round label (${JSON.stringify(c.why.slice(0, 120))})`);
+  }
+
+  // a canned pick that reaches the AI rounds. With the page's own budgets no pick gets there on a fast device (every repaired version is
+  // proven and accepted); it does when the search of both the pick's own game and its repaired version cannot finish, which the starved
+  // budget stands in for (20 positions: the page's limit for one search, which is final, so no longer search is offered and the request
+  // goes on). Round 1 of the AI is checked on the same starved budget and rejected; round 2 gets the later tries' budget and is proven
+  {
+    const at = 'case 23 (a canned pick, then the AI rounds)', PICKED = PICK_A + texts.name + PICK_B;
+    await fresh('proof', at);
+    const caps0 = await starve('maxStates', 20);
+    let first = null, firstLog = [], mid = null, midQuiz = null;
+    const w0 = await writes();
+    try {
+      await hold([texts.repair]);
+      await page.evaluate(() => { window.__nrp.quick(window.__nrp.QUICK.find((o) => o.id === 'pocket')); });
+      await asked(1, at + ': the first writer call');
+      first = (await resultCard(page)).why; firstLog = await logLines(page);
+      await letGo();
+      await asked(2, at + ': the second writer call');
+      mid = (await resultCard(page)).why; midQuiz = await page.evaluate(() => window.__nrp.quiz());
+    } finally { await unstarve(caps0); }
+    await letGo(); await busyEnd(at); await sleep(200);
+    const c = await resultCard(page);
+    await note();
+    check(firstLog.filter((x) => x.startsWith(CAPPED_LOG)).length === 2, `${at}: premise: the pick's own game and its repaired version were both rejected before the AI writer was asked (${firstLog.filter((x) => x.startsWith(CAPPED_LOG)).length} rejections)`);
+    check((await writes()) - w0 === 2, `${at}: premise: the AI writer was then asked twice (got ${(await writes()) - w0})`);
+    check(typeof first === 'string' && first.startsWith(PICKED) && first.includes(CAPPED_CARD) && !ROUND.test(first), `${at}: the card while the AI writer's first answer is awaited keeps the pick's opening words and has no round label (${JSON.stringify(first)})`);
+    check(midQuiz !== 'longer' && typeof mid === 'string' && mid.includes(CAPPED_CARD), `${at}: premise: the AI writer's first game was rejected too and the request went on without a pause (${JSON.stringify(mid)})`);
+    check(typeof mid === 'string' && /^Round 1\. \S/.test(mid) && !mid.includes(PICKED), `${at}: the card of the AI writer's rejected first try, while the second is awaited, opens with its round label (${JSON.stringify(mid)})`);
+    check(c.st === 'RULE HELD' && (await page.evaluate(() => window.__nrp.program())) === texts.repairSrc, `${at}: premise: the second answer was accepted and the game runs it (${c.st})`);
+    check(!ROUND.test(c.why) && c.why.startsWith(PROOF_CARD.trim()), `${at}: the final card carries a round label, or does not open with the proof's sentence (${JSON.stringify(c.why.slice(0, 120))})`);
+  }
+
+  // the longer-search pause under Code (proof): the typed request's first game is unwinnable but its search runs out of time (1 ms; the
+  // position limit cannot be the knob here, because a search that stops at the limit is final and gets no offer). The request stops on
+  // the offer to search again with another try pending, so that card keeps its label; the reader resumes, the longer search proves the
+  // same game, and the card the request ends on has no label
+  {
+    const at = 'case 23 (proof, the longer-search pause)';
+    await fresh('proof', at);
+    await page.evaluate((src) => { window.__mock.program = src; }, texts.repairSrc);
+    const caps0 = await starve('maxMs', 1);
+    const w0 = await writes(); let p = null, s = null;
+    try {
+      await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+      await sleep(100); await busyEnd(at + ' pause'); await sleep(200);
+      p = await resultCard(page);
+      s = await page.evaluate(() => { const n = window.__nrp, c = n.continuation(), L = c && c.longer, b = document.querySelector('#card button[data-longer]'), q = document.querySelector('#card .quiz');
+        return { quiz: n.quiz(), kind: c && c.kind, offer: L ? n.offerText(L) : null, label: L ? n.offerLabel(L) : null, btn: b && b.getClientRects().length ? b.innerText : null, quizText: q ? q.innerText : '', atDefault: n.program() === n.DEFAULT_PROGRAM }; });
+    } finally { await unstarve(caps0); }
+    await note();
+    check(s.quiz === 'longer' && s.kind === 'longer' && s.label && s.btn === s.label && s.offer && s.quizText.includes(s.offer), `${at}: premise: the request stopped on the offer to search again, with the page's own offer sentence and button (${JSON.stringify(s)})`);
+    check((await writes()) - w0 === 1 && s.atDefault && p.why.includes(CAPPED_CARD), `${at}: premise: one writer call, the game unchanged, and the card says the search could not finish (${JSON.stringify(p.why.slice(0, 120))})`);
+    check(/^Round 1\. \S/.test(p.why), `${at}: the card the request is paused on, with another try pending, opens with its round label (${JSON.stringify(p.why.slice(0, 120))})`);
+    const n0 = (await logLines(page)).length;
+    await page.click('#card button[data-longer]');
+    await sleep(100); await busyEnd(at + ' resumed'); await sleep(200);
+    const c = await resultCard(page), L = (await logLines(page)).slice(n0);
+    await note();
+    check(L.some((x) => x.startsWith(LONGER_LOG)) && (await writes()) - w0 === 1, `${at}: premise: the resume ran the longer search and asked the AI writer nothing more (${(await writes()) - w0} writer call(s))`);
+    check(c.st === 'RULE HELD' && (await page.evaluate(() => window.__nrp.quiz())) !== 'longer' && (await page.evaluate(() => window.__nrp.program())) === texts.repairSrc, `${at}: premise: the longer search finished and the same game was accepted (${c.st})`);
+    check(!ROUND.test(c.why) && c.why.startsWith(PROOF_CARD.trim()), `${at}: the final card after the resume carries a round label, or does not open with the proof's sentence (${JSON.stringify(c.why.slice(0, 120))})`);
   }
   // what these runs put on the page (cards, log, status) never says "writer" without "AI"; premise: they did name the AI writer
   const bare = seenText.search(BARE_WRITER_SEEN);

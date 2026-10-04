@@ -2404,7 +2404,7 @@ async function enforce(src, say, how, ctx, pre){
   const status=document.getElementById('status'); const gone=()=>ctx.reqId!==reqId;
   const label=how, typed=ctx.from==='ai'; let approved=false; if(typed) how='';   // a typed request's `how` is its round label ("Round N."): only the card of a round that will be retried carries it (Mo, 2026-10-04)
   const reject=(fb, why, kind)=>{ (ledgers[mode]=ledgers[mode]||[]).push({ask:ctx.ask, say:say||label, why:fb, src}); now.say=say; now.why=((typed&&(approved||!ctx.retry) ? '' : label)+' '+why).trim(); now.whyLine=''; renderCard(); return {done:false, feedback:fb, kind:kind||'other'}; };
-  status.textContent='checking the game\u2026'; now.from=ctx.from||''; ctx.how=how;   // v38: the card's prefix ("Round N." or the pick), for the unknown-verdict text   // v33: whose words the card holds, for the header above it
+  status.textContent='checking the game\u2026'; now.from=ctx.from||''; ctx.how=how;   // v38: the card's opening words (a canned pick's "You picked ..."; none on a typed request, whose round label only reject() puts back), for the unknown-verdict text   // v33: whose words the card holds, for the header above it
   { const cw=coordWhy(ctx.whyLine); if(cw){ logLine('no','the game did not run, so it was rejected before any check. '+cw+'.'); return reject('the program did not run: '+cw+'. Fix that first.', 'The game did not run, so it was rejected. '+cw+'.', 'failed'); } }   // v34: a coordinate in the WHY
   if(!ctx.whyLine){ logLine('no','the game did not run, so it was rejected before any check. '+NO_WHY+'.'); return reject('the program did not run: '+NO_WHY+'. Fix that first.', 'The game did not run, so it was rejected. '+NO_WHY+'.', 'failed'); }   // v33: no WHY line, no run
   tried.push({how:label, mode, ask:ctx.ask||'', src}); const chk=pre||await checkCandidate(src, ctx, ctx.later ? LATER_CAPS : CAPS); if(gone()) return {done:true,gone:true};
@@ -2458,7 +2458,7 @@ async function request(userMsg, opts){
   const my=++reqId; busy=true; renderSeg(); renderOpts();
   const send=document.getElementById('send'), stop=document.getElementById('stop'), status=document.getElementById('status');
   send.disabled=true; stop.disabled=false; ctl=new AbortController(); now={fell:false,say:'',why:'',program:''}; quizState=null; document.getElementById('approve').innerHTML=''; renderCard();
-  // a resume carries on a paused request: after six caught (Ask the AI for 6 more programs: six fresh rounds), after a capped candidate (Go on: the candidates and rounds that were left; Search again with more time: the same candidate at ten times the cap first)
+  // a resume carries on a paused request: after six caught (Ask the AI writer for 6 more games: six fresh rounds), after a capped candidate (Go on: the candidates and rounds that were left; Search again with more time: the same candidate at ten times the cap first)
   const rs=opts.resume||null; continuation=null;
   logSep(); logLine('you','> ['+MODES.find(m=>m.id===mode).name+'] '+userMsg+(rs ? (rs.longer ? ' (searching longer)' : rs.rounds!=null ? ' (the longer search skipped)' : ' (six more rounds)') : ''));
   const pre=(rs&&rs.pre)||opts.pre||[]; const retrying=(mode==='proof'||mode==='test'||mode==='judge'||(mode==='human'&&!pre.length));   // Human retries a typed request only: a held-back program is a caught round

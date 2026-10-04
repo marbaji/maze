@@ -993,6 +993,12 @@ ROUND_EDITS = [
      1, "accept(): the card's sentences without opening words"),
     ("  quizState='ask'; renderSeg(); renderCard(); return {done:true};\n}\nconst APPLIES=", "  now.why=now.why.trim(); quizState='ask'; renderSeg(); renderCard(); return {done:true};\n}\nconst APPLIES=", 1,
      "accept(): a card that starts with the page's own sentence has no leading space"),
+    # two comments a reader of View Source meets, brought in line with the rule and with the wording pass
+    ("ctx.how=how;   // v38: the card's prefix (\"Round N.\" or the pick), for the unknown-verdict text",
+     "ctx.how=how;   // v38: the card's opening words (a canned pick's \"You picked ...\"; none on a typed request, whose round label only reject() puts back), for the unknown-verdict text",
+     1, "comment in enforce(): what the card's opening words are since the round label rule"),
+    ("after six caught (Ask the AI for 6 more programs: six fresh rounds)", "after six caught (Ask the AI writer for 6 more games: six fresh rounds)", 1,
+     "comment in request(): the six-caught button by the name it has on the page"),
 ]
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 
