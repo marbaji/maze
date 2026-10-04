@@ -21,6 +21,7 @@ python3 build/make-play-page.py
 python3 build/make-wip-page.py
 node tests/byok.test.cjs
 bash tests/rebuild-check.sh
+python3 tests/page-checks-test.py
 python3 tests/privacy-scan.py
 python3 tests/readme-links-check.py
 node tests/play-page-check.cjs index.html

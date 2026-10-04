@@ -20,6 +20,8 @@ jobs:
         run: node tests/byok.test.cjs
       - name: Rebuild matches the committed pages
         run: bash tests/rebuild-check.sh
+      - name: The build refuses a page that contradicts itself
+        run: python3 tests/page-checks-test.py
       - name: Privacy scan
         run: python3 tests/privacy-scan.py
       - name: README line links
