@@ -64,16 +64,33 @@ def once(text, s, what):
         fail(f"{what}: expected 1 match, found {text.count(s)}")
 
 
+def parse_row(line):
+    """One row of the MODES table as a dict. The row must be exactly ` {key:'text',key:true,...},` with every key once:
+    anything else (a space, a double-quoted text, a key given twice, which the page's script would read differently
+    from this reader) stops the build, so the row is rewritten in the table's own style rather than half-read."""
+    if not (line.startswith(" {") and line.endswith("},")):
+        fail(f"unreadable MODES row: {line[:60]}")
+    rest, row = line[2:-2], {}
+    while rest:
+        m = re.match(r"(\w+):(?:'((?:[^'\\]|\\.)*)'|(true))(?:,(?=\w)|$)", rest)
+        if not m:
+            fail(f"unreadable MODES row at ...{rest[:40]!r}: {line[:60]}")
+        if m.group(1) in row:
+            fail(f"MODES row gives {m.group(1)} twice; the page's script would use the last: {line[:60]}")
+        row[m.group(1)] = True if m.group(3) else re.sub(r"\\(.)", r"\1", m.group(2))
+        rest = rest[m.end():]
+    if not isinstance(row.get("id"), str) or not re.fullmatch(r"[a-z]+", row["id"]):
+        fail(f"unreadable MODES row (no id): {line[:60]}")
+    return row
+
+
 def field(row, name, mid, required=True):
-    """The text of a single-quoted field of a MODES row, as the page would show it."""
-    found = re.findall(r"[{,]" + name + r":'((?:[^'\\]|\\.)*)'", row)
-    if len(found) > 1:
-        fail(f"MODES row {mid} has {name} {len(found)} times; the page's script would use the last")
-    if not found:
+    """The text of a field of a parsed MODES row, as the page would show it."""
+    if not isinstance(row.get(name), str):
         if required:
             fail(f"MODES row {mid} has no {name}")
         return None
-    return re.sub(r"\\(.)", r"\1", found[0])
+    return row[name]
 
 
 def check_sim(t):
@@ -118,15 +135,13 @@ def check_switch(t):
     m = one(r"^const MODES=\[\n(.*?)\n\];", t, "MODES table", re.S | re.M)
     rows = []
     for line in m.group(1).split("\n"):
-        rid = re.match(r" \{id:'([a-z]+)',", line)
-        if not rid or not line.endswith("},"):
-            fail(f"unreadable MODES row: {line[:60]}")
-        rows.append((rid.group(1), line))
+        row = parse_row(line)
+        rows.append((row["id"], row))
     ids = [mid for mid, _ in rows]
     if len(rows) < 2 or len(set(ids)) != len(ids):
         fail(f"MODES ids: {ids}")
     names = {mid: field(row, "name", mid) for mid, row in rows}
-    off = {mid for mid, row in rows if re.search(r",disabled:true[,}]", row)}
+    off = {mid for mid, row in rows if row.get("disabled") is True}
     arts = [field(row, "art", mid) for mid, row in rows]
     if len(set(arts)) != len(rows):
         fail(f"MODES rows must each have their own article anchor: {arts}")
