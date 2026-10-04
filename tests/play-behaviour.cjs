@@ -281,7 +281,7 @@ async function case5() {
   await saveKey(page, KEY);
   await ask(page, 'make a small different game with a door');
   const rec = await arrived('writer', 1);
-  await until(async () => /the AI is writing/.test(await page.textContent('#log')), 15000, 'the first delta to render');
+  await until(async () => /the AI writer is writing/.test(await page.textContent('#log')), 15000, 'the first delta to render');
   await page.click('#stop');
   await until(() => aborted(failed), 5000, 'the writer request to fail as aborted').catch(() => {});
   check(aborted(failed), 'case 5: Stop did not abort the request');
@@ -475,7 +475,7 @@ async function case7b() {
     check((await page.evaluate(() => window.__fakeCalls)) >= 1, 'case 7b (claude.ai): the ask did not go through claude.use("sample")');
     check(routed.length === 0, 'case 7b (claude.ai): the ask went to the network');
     const log = (await state(page)).log;
-    check(/AI: Made a small five by five game/.test(log), 'case 7b (claude.ai): premise: the writer answer is not in the log');
+    check(/AI writer: Made a small five by five game/.test(log), 'case 7b (claude.ai): premise: the writer answer is not in the log');
     check(!MODEL_LINE.test(log), 'case 7b (claude.ai): a serving-model line on the claude.ai-hosted path:\n' + log);
     await context.close();
     // and a judge call on the claude.ai-hosted path
@@ -502,7 +502,7 @@ async function case11() {
     await until(async () => /result: RULE HELD/.test(await page.textContent('#log')), 30000, at + ' ask');
     const log = (await state(page)).log;
     check(routed.length === 1 && routed[0].kind === 'writer', `${at}: premise: expected one writer call, got ${routed.map((r) => r.kind).join(',')}`);
-    check(/AI: Made a small five by five game/.test(log), `${at}: premise: the answer is not in the log`);
+    check(/AI writer: Made a small five by five game/.test(log), `${at}: premise: the answer is not in the log`);
     const lines = log.split('\n').filter((l) => MODEL_LINE.test(l));
     if (want) check(lines.length === 1 && lines[0] === 'this round was answered by Claude Opus 4.8, not Opus 5.5.', `${at}: model lines ${JSON.stringify(lines)}`);
     else check(lines.length === 0 && !/Claude Opus/.test(log), `${at}: model lines on an Opus 5.5 round ${JSON.stringify(lines)}`);
@@ -520,7 +520,7 @@ async function case11() {
     await until(() => routed.some((r) => r.kind === kind), 30000, at + ' call');
     await idle(page);
     const log = (await state(page)).log;
-    check(/judge: passed|AI: Applied as asked/.test(log), `${at}: premise: the ${kind} answer was not used:\n` + log);
+    check(/judge: passed/.test(log), `${at}: premise: the ${kind} answer was not used:\n` + log);
     const lines = log.split('\n').filter((l) => MODEL_LINE.test(l));
     check(lines.length === 1 && lines[0] === want, `${at}: model lines ${JSON.stringify(lines)}`);
     await context.close();
@@ -546,6 +546,12 @@ async function case12() {
   const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
   check(quickWhys.length >= 2 && win && keep && repairWhy(win.id), `case 12: premise: could not read a winnable and an unwinnable change from QUICK (${quickWhys.length} read)`);
   if (!win || !keep) return;
+  // the two log lines these checks turn on, read from the page so a reworded line is followed: what the page logs when a new game is put
+  // on the board, and what it logs before a canned change goes to the check
+  const runLit = pageLits(/logLine\('ok',(LIT)\+\(view\.goal\|\|/), firstLit = pageLits(/ : (LIT)\);   \/\/ Human: the log does not give the repair away/);
+  check(runLit && firstLit, 'case 12: premise: the page has the line it logs when a new game runs and the line before a canned change is checked');
+  if (!runLit || !firstLit) return;
+  const [RUNNING] = runLit, [CHECK_FIRST] = firstLit;
   const runs = [];
   for (const mode of ['Judge', 'Prose']) for (const e of [win, keep]) {
     routed = [];
@@ -556,23 +562,24 @@ async function case12() {
     await idle(page);
     const s = await state(page);
     runs.push(at);
-    const applied = /running the new program/.test(s.log);
+    const applied = s.log.includes(RUNNING);
     check(routed.length === 0, `${at}: an Anthropic request was made with no key`);
     check(/RULE HELD/.test(s.card), `${at}: the rule did not hold:\n${s.card}`);
     check(!/\u2014/.test(s.card), `${at}: an em dash on the card`);
     if (mode === 'Judge' && e === win) {
       // the literal program is caught by the simulated verdict; the page's repaired version is then judged let through, and runs
-      check(s.log.includes('the page stands in for the judge on a canned change: rejected this program. a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the stand-in verdict:\n${s.log}`);
+      check(s.log.includes('the page stands in for the judge on a canned change: rejected this game. a judge that reads the program correctly says it can be won: "' + q(e.why) + '".'), `${at}: the literal program was not caught by the stand-in verdict:\n${s.log}`);
       check(/the page has a repaired version of it/.test(s.log) && applied, `${at}: the repaired version did not run:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". The literal version was caught, so the page ran its repaired version. ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (mode === 'Judge') {
       check(applied && /the page stands in for the judge on a canned change: passed\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.judge_keep()), `${at}: card:\n${s.card}`);
     } else if (e === win) {
-      check(!applied && !/the program goes to the check/.test(s.log), `${at}: the change was applied:\n${s.log}`);
+      check(!applied && !s.log.includes(CHECK_FIRST), `${at}: the change was applied:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_win(e.why)), `${at}: card:\n${s.card}`);
     } else {
       check(applied && /applied\. nobody checked it\./.test(s.log), `${at}: the change was not applied:\n${s.log}`);
+      check(s.log.includes(CHECK_FIRST), `${at}: premise: an applied canned change logs the line the refused one must not have:\n${s.log}`);
       check(s.card.includes('You picked "' + e.name + '". ' + SIM.prose_keep()), `${at}: card:\n${s.card}`);
     }
     await context.close();
@@ -1124,6 +1131,38 @@ async function case20() {
   }
 }
 
+// ---- the wording pass (Mo, 2026-10-04): one name for the model that writes a new game, "the AI writer"
+const BARE_WRITER = /(?<!AI )\bthe writer/i;   // "the writer" that is not "the AI writer"
+const BARE_WRITER_SEEN = /(?<!AI )\bwriter/i;   // in what a reader sees, the word never stands without "AI" at all ("AI writer: ..." in the log)
+async function case22() {
+  // "the writer" appears nowhere a reader can meet it without "AI" before it: not in the page's source outside whole-line // comments (so
+  // every string the script holds, the chart and the first paint are covered), and not in what is drawn under any switch
+  check(BARE_WRITER.test('goes back to the writer, up to 6 tries') && BARE_WRITER.test("The writer's note") && !BARE_WRITER.test('goes back to the AI writer') && !BARE_WRITER.test("The AI writer's note"),
+    'case 22: premise: the matcher tells "the writer" from "the AI writer"');
+  const hits = SRC.split('\n').map((l, i) => ({ n: i + 1, l })).filter((x) => BARE_WRITER.test(x.l) && !/^\s*\/\//.test(x.l))
+    .map((x) => `line ${x.n}: ...${x.l.slice(Math.max(0, x.l.search(BARE_WRITER) - 60), x.l.search(BARE_WRITER) + 40)}...`);
+  check(hits.length === 0, `case 22: "the writer" without "AI" in the page source, outside a whole-line comment:\n    ${hits.join('\n    ')}`);
+  const { context, page } = await open({ name: 'case 22' });
+  const names = await page.evaluate(() => [...document.querySelectorAll('#seg button')].filter((b) => !b.disabled).map((b) => b.querySelector('span').textContent));
+  // premise: the name is in use, in the source at least once for every choosable switch's chart and once more for the script's own lines
+  const named = (SRC.match(/the AI writer/gi) || []).length;
+  check(names.length >= 8 && named > names.length, `case 22: premise: "the AI writer" appears ${named} times in the source for ${names.length} choosable switches`);
+  let labelled = 0;
+  for (const n of names) {
+    await press(page, n); await sleep(150);
+    const s = await page.evaluate(() => { const f = [...document.querySelectorAll('#flow .flowfig')].filter((x) => getComputedStyle(x).display !== 'none' && x.getClientRects().length);
+      return { on: document.querySelector('#seg button.on span').textContent, figs: f.length, chart: f.map((x) => x.textContent).join('\n'), labels: f.flatMap((x) => [...x.querySelectorAll('text.fc-lbl')].map((t) => t.textContent)), body: document.body.innerText }; });
+    check(s.on === n && s.figs === 1, `case 22 (${n}): premise: the switch is on ${s.on} with ${s.figs} chart(s) shown`);
+    if (s.labels.includes('The AI writer')) labelled++;
+    for (const [what, text] of [['the chart', s.chart], ['the page', s.body]]) {
+      const at = text.search(BARE_WRITER_SEEN);
+      check(at < 0, `case 22 (${n}): ${what} says "writer" without "AI": ...${text.slice(Math.max(0, at - 60), at + 40)}...`);
+    }
+  }
+  check(labelled === names.length, `case 22: premise: the chart labels its second box "The AI writer" under ${labelled} of ${names.length} switches`);
+  await context.close();
+}
+
 async function case9() {
   const keys = [KEY, KEY2];
   let apiSeen = 0;
@@ -1155,7 +1194,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/' + PAGE)).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['22', case22], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;

@@ -344,7 +344,7 @@ COPY_EDITS = [
      "The canned changes still work.',",
      1, 'sampling_disabled: the same clause, the same reason'),
     ("      if(!sampleNs){ const w=opts.gate.why;   // no key: the simulated answer, from the change's own why line",
-     "      if(true){ const w=opts.gate.why;   // a canned change never asks the AI, key or no key: the page's own answer, from the change's own why line",
+     "      { const w=opts.gate.why;   // a canned change never asks the AI, key or no key: the page's own answer, from the change's own why line",
      1, 'Prose: a canned change takes the page\'s own answer, key or no key'),
     ("if(mode==='judge'){ if(sampleNs){ status.textContent='the judge (Opus) is reading the program\\u2026';",
      "if(mode==='judge'){ const canned=ctx.from==='page'; if(sampleNs&&!canned){ status.textContent='the judge (Opus) is reading the program\\u2026';",
@@ -427,30 +427,33 @@ CSS = (SOON_CSS +
        "@media (min-width:900px){.sw2{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}\n")
 
 
-# ---- the flow chart (spec_2026-10-02-maze-flow-chart.md, outreach-playbook). Ported unchanged from the approved mockup's
+# ---- the flow chart (spec_2026-10-02-maze-flow-chart.md, outreach-playbook). Ported from the approved mockup's
 # generator, 20-areas/outreach-playbook/artifacts/maze-flow-chart/build-mockup.py (version 8, every label, note, caption
-# and ALT read and approved by Mo), except the sentence under the chart, which is the body's 17px here (the mockup had 15).
+# and ALT read and approved by Mo), except the sentence under the chart, which is the body's 17px here (the mockup had 15),
+# and "the writer", which is "the AI writer" everywhere since the wording pass (Mo, 2026-10-04: "instead of 'writer' say
+# 'AI writer' since it's always AI"); Nothing's caption glossed the term ("the writer, the AI that writes a new game from
+# it") and now reads "the AI writer, which writes a new game from it".
 # One figure per choosable switch inside #flow; renderPos() sets #flow's data-m to the mode and CSS shows that figure.
 # what each state draws: its timeline, who the checker is, and the sentence under the figure (draft wording, Mo's to edit)
 STATES = {
-    "nothing": dict(kind="straight", cap="Your request goes to the writer, the AI that writes a new game from it (one Opus call). The game lands on this page. The rule is there, but nothing checks it."),
-    "prose": dict(kind="straight", cap="The rule is one sentence in the writer's instructions. Nothing checks the game after the writer writes it, so it lands on this page either way."),
+    "nothing": dict(kind="straight", cap="Your request goes to the AI writer, which writes a new game from it (one Opus call). The game lands on this page. The rule is there, but nothing checks it."),
+    "prose": dict(kind="straight", cap="The rule is one sentence in the AI writer's instructions. Nothing checks the game after the AI writer writes it, so it lands on this page either way."),
     "human": dict(kind="human", who="you", cap="The new game stops at a checker, and the checker is you. If you approve it, it lands on this page. If you reject it, nothing changes."),
-    "judge": dict(kind="loop", who="a second AI", cap="The new game stops at a checker: a second AI that reads the game and the writer's note (one more Opus call). An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
-    "test": dict(kind="loop", who="20 playthroughs", cap="The new game stops at a checker: code on this page that plays it 20 times. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
-    "proof": dict(kind="loop", who="every position", cap="The new game stops at a checker: code on this page that searches every position the game can reach. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the writer, up to 6 tries."),
+    "judge": dict(kind="loop", who="a second AI", cap="The new game stops at a checker: a second AI that reads the game and the AI writer's note (one more Opus call). An approved game lands on this page. A rejected game goes back to the AI writer, up to 6 tries."),
+    "test": dict(kind="loop", who="20 playthroughs", cap="The new game stops at a checker: code on this page that plays it 20 times. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the AI writer, up to 6 tries."),
+    "proof": dict(kind="loop", who="every position", cap="The new game stops at a checker: code on this page that searches every position the game can reach. No AI is involved in the check. An approved game lands on this page. A rejected game goes back to the AI writer, up to 6 tries."),
     "construction": dict(kind="straight", cap="Nothing checks the game on its way. One pellet sits outside the game, where no program can reach it, so no game that lands on this page can be won."),
-    "capability": dict(kind="cap", cap="The writer has no tool to hand a game over, so nothing you ask for can land on this page. The page does not even call the writer, so no Opus call is spent."),
+    "capability": dict(kind="cap", cap="The AI writer has no tool to hand a game over, so nothing you ask for can land on this page. The page does not even call the AI writer, so no Opus call is spent."),
 }
 ALT = {
-    "nothing": "Your request goes to the writer, and the new game travels straight to this page. The rule floats above the track and nothing checks it.",
-    "prose": "The rule sits inside the writer as one line of its instructions. The new game travels straight to this page.",
+    "nothing": "Your request goes to the AI writer, and the new game travels straight to this page. The rule floats above the track and nothing checks it.",
+    "prose": "The rule sits inside the AI writer as one line of its instructions. The new game travels straight to this page.",
     "human": "The new game stops at a checker box that holds the rule. The checker is you. Approved, it lands on this page; rejected, nothing changes.",
-    "judge": "The new game stops at a checker box that holds the rule. The checker is a second AI. A rejected game loops back to the writer; an approved game lands on this page.",
-    "test": "The new game stops at a checker box that holds the rule. The checker is 20 playthroughs. A rejected game loops back to the writer; an approved game lands on this page.",
-    "proof": "The new game stops at a checker box that holds the rule. The checker searches every position. A rejected game loops back to the writer; an approved game lands on this page.",
+    "judge": "The new game stops at a checker box that holds the rule. The checker is a second AI. A rejected game loops back to the AI writer; an approved game lands on this page.",
+    "test": "The new game stops at a checker box that holds the rule. The checker is 20 playthroughs. A rejected game loops back to the AI writer; an approved game lands on this page.",
+    "proof": "The new game stops at a checker box that holds the rule. The checker searches every position. A rejected game loops back to the AI writer; an approved game lands on this page.",
     "construction": "The new game travels straight to this page. The rule sits on the page itself, and one pellet sits outside the game.",
-    "capability": "The writer is greyed out and is not called. The track out of it is cut, with the rule sitting in the gap. Nothing reaches this page.",
+    "capability": "The AI writer is greyed out and is not called. The track out of it is cut, with the rule sitting in the gap. Nothing reaches this page.",
 }
 
 
@@ -481,7 +484,7 @@ def writer(mid):
             '<circle cx="260" cy="114" r="6" fill="var(--teal)"></circle>'
             '<rect x="336" y="124" width="10" height="32" rx="4" fill="var(--teal)"></rect>'
             + lines + (sticky(187, 160) if mid == "prose" else ""))
-    label = '<text class="fc-lbl" x="260" y="232" text-anchor="middle">The writer</text>'
+    label = '<text class="fc-lbl" x="260" y="232" text-anchor="middle">The AI writer</text>'
     if mid == "capability":   # never called: greyed, its gear still
         return f'<g opacity=".4">{body.replace(chr(32) + "class=" + chr(34) + "fc-gear" + chr(34), "")}</g>' + label + '<text class="fc-lbl" x="260" y="256" text-anchor="middle">(not called)</text>'
     return body + label
@@ -552,7 +555,7 @@ def figure(mid, uid):
         track += line(346, 415) + line(580, 659)
         if kind == "loop":
             track += (f'<path d="M500 78V47H260V73" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#{uid}-arr-no)"></path>'
-                      '<text class="fc-rej" x="380" y="14" text-anchor="middle">rejected game: back to the writer, up to 6 tries</text>')
+                      '<text class="fc-rej" x="380" y="14" text-anchor="middle">rejected game: back to the AI writer, up to 6 tries</text>')
         else:
             track += ('<path d="M500 78V50" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-dasharray="7 6"></path>'
                       '<path d="M494 40l12 12M506 40l-12 12" fill="none" stroke="var(--sucks)" stroke-width="2.5" stroke-linecap="round"></path>'
@@ -645,7 +648,7 @@ CSS_FIG = """
 @keyframes fcL-gp{0%,86%{opacity:0}89%,96%{opacity:1}99%,100%{opacity:0}}
 @keyframes fcL-pop{0%,87%{transform:scale(1)}91%{transform:scale(1.06)}95%,100%{transform:scale(1)}}
 @keyframes fcL-dot{0%,23%{fill:var(--line)}25%,31%{fill:var(--teal)}34%,70%{fill:var(--line)}72%,77%{fill:var(--teal)}80%,100%{fill:var(--line)}}
-/* no tool: Capability. Nothing moves: the page never calls the writer, and the track out of it is cut */
+/* no tool: Capability. Nothing moves: the page never calls the AI writer, and the track out of it is cut */
 @media (prefers-reduced-motion:reduce){.fc *{animation:none!important}}
 """
 
@@ -692,7 +695,7 @@ CAP_NOTICE = ('Under "Capability", the AI has no tool to change the game. You ca
 CAP_CARD = ('You asked for "', '". The AI has no tool to change the game here, so your request has nowhere to go. '
             'This page did not call Opus.')
 CAP_LOG = "no tool here. nothing to submit through. no Opus call was made."
-CAP_H = "Nothing you ask for can change the game here. The writer has no tool to hand a game over, so the page does not call it."
+CAP_H = "Nothing you ask for can change the game here. The AI writer has no tool to hand a game over, so the page does not call it."
 CAP_JS = (
     "// Capability, option A (Mo, 2026-10-02): the page answers both ways of asking itself, with no Opus call, so no key is needed\n"
     f"const CAP_NOTE='<p class=\"capnote\">'+{js_str(CAP_NOTICE)}+'</p>', CAP_LOG={js_str(CAP_LOG)};\n"
@@ -742,7 +745,7 @@ HUMAN_NEVER = (' You approved it from the summary. The summary said you got a wi
                'do that. A human enforcer is only as good as the reading: open the program and read to the bottom.')
 HUMAN_OPENED = (' You opened the program and approved it without reading to the bottom. The summary said you got a winnable '
                 'game; the program did not do that. Read to the bottom.')
-HUMAN_HOLD = "the page holds back a program it cannot prove unwinnable under Human; the writer is asked again."
+HUMAN_HOLD = "the page holds back a game it cannot prove unwinnable under Human; the AI writer is asked again."
 # the card while a held-back typed request is re-asked (Mo, 2026-10-03: the plainer wording); the round number goes before it
 HUMAN_HOLD_CARD = "The AI's game could still be won, so this page asked the AI to try again before showing it to you."
 # what the log's result line says after "RULE BROKEN under Human." when the reader approved the gift (Mo, 2026-10-03)
@@ -806,6 +809,151 @@ HUMAN_EDITS = [
      "if(now.unknown&&ctx&&typeof ctx.how==='string') now.why=(ctx.how+' '+unknownText(mode, !!ctx.opened)).trim();",
      1, "the unknown text with or without a prefix (Human after an approval has none)"),
 ]
+# The wording pass (Mo, 2026-10-04, on the proposal in outreach-playbook/artifacts/maze-wording-pass: "apprved for all but
+# instead of 'writer' say 'AI writer' since it's always AI"). Two swaps make almost all of it. "The AI", where it means the
+# model that writes a new game, becomes "the AI writer", and so does every "the writer" the page already had (the chart, the
+# cards and the answers above carry it in their own constants). "Program" becomes "game" where the reader is not looking at
+# code. Left as they were: the approved texts that say "the AI" (the Human summary and held texts, the Capability notice and
+# card, the copy above the game, "paused while the AI works", the error cards that mean every AI call), the approved cards
+# that say "program", every sentence about opening or reading the program, and everything the AI writer and the judge are
+# sent. Applied after the Human edits, on the text they leave. Each is (old, new, how many times old must occur, what it is).
+WORDING_EDITS = [
+    # --- "the AI" becomes "the AI writer"
+    (r"'asking the AI to write the game\u2026'", r"'asking the AI writer to write the game\u2026'", 2,
+     "the status line and the log line when a typed request starts"),
+    (r"'the AI is thinking\u2026 (this can take", r"'the AI writer is thinking\u2026 (this can take", 1, "log: while the first words are awaited"),
+    (r"'the AI is writing\u2026 '", r"'the AI writer is writing\u2026 '", 1, "log: while the answer streams in"),
+    ("or locking the screen, stops the AI.'", "or locking the screen, stops the AI writer.'", 1, "log: the phone warning"),
+    ("logLine('think','AI: '+say); if(reply&&reply.why) logLine('think','AI, why: '+reply.why);",
+     "logLine('think','AI writer: '+say); if(reply&&reply.why) logLine('think','AI writer, why: '+reply.why);", 1,
+     "log: the note and the reason that came with the new game"),
+    ("'the AI says this is a bare demand to win,", "'the AI writer says this is a bare demand to win,", 1, "log: after a bare demand to win"),
+    ("'the AI reports a limit of the page: '", "'the AI writer reports a limit of the page: '", 1, "log: a limit of the page"),
+    ("'the AI sent a program ('", "'the AI writer sent a game ('", 1, "log: the answer has arrived"),
+    ("'What the AI wrote for your request' : 'The program the page ran for your pick'",
+     "'What the AI writer wrote for your request' : 'The game the page ran for your pick'", 1, "the header above the result card"),
+    ("after you ask for a change and the AI builds the game you asked for.", "after you ask for a change and the AI writer builds the game you asked for.", 2,
+     "the empty result box, in the script and in the static first paint"),
+    (r"""' The page\u2019s own repaired version was rejected too, and the AI needs a key to go on.':' The AI needs a key to go on.')+' Paste an Anthropic API key in the "Ask Me Anything" tab and the AI keeps the request""",
+     r"""' The page\u2019s own repaired version was rejected too, and the AI writer needs a key to go on.':' The AI writer needs a key to go on.')+' Paste an Anthropic API key in the "Ask Me Anything" tab and the AI writer keeps the request""",
+     1, "the cards when a canned change needs the AI writer and no key is saved"),
+    ("empty_completion:'The AI answered with nothing.", "empty_completion:'The AI writer answered with nothing.", 1, "error card: an empty answer"),
+    ("' The AI had written '", "' The AI writer had written '", 1, "error card: the call broke off part way"),
+    ("'caught. the AI is rewriting ('", "'caught. the AI writer is rewriting ('", 1, "the status line on a second or later try"),
+    ("': the AI is rewriting with the reason, the request kept whole", "': the AI writer is rewriting with the reason, the request kept whole", 1,
+     "log: the start of a second or later try"),
+    ('data-more="1">Ask the AI for 6 more programs</button>', 'data-more="1">Ask the AI writer for 6 more games</button>', 1, "the button after six rejected tries"),
+    ("'Six programs in a row were caught. The game is unchanged and the rule is still standing. Asking the AI for 6 more programs runs",
+     "'Six games in a row were caught. The game is unchanged and the rule is still standing. Asking the AI writer for 6 more games runs", 2,
+     "the card after six rejected tries"),
+    ("'six programs in a row were caught. the game is unchanged and the rule is still standing. ask the AI for 6 more programs, or leave it: your call.'",
+     "'six games in a row were caught. the game is unchanged and the rule is still standing. ask the AI writer for 6 more games, or leave it: your call.'", 2,
+     "log: after six rejected tries"),
+    ("'ask the AI for 6 more programs, or leave it.'", "'ask the AI writer for 6 more games, or leave it.'", 1, "log: while the six-caught card waits"),
+    ("Throw this program away and have the AI rewrite a smaller program</button>", "Throw this game away and have the AI writer rewrite a smaller game</button>", 1,
+     "the button beside the offer to search longer"),
+    ("continue as it would have: the AI rewrites with the reason,", "continue as it would have: the AI writer rewrites with the reason,", 1,
+     "the card under the offer to search longer"),
+    ("or skip it and let the AI rewrite.'", "or skip it and let the AI writer rewrite.'", 1, "log: while the longer-search card waits"),
+    ("broke:'No. Nothing checks the program you asked for after the AI writes it, so every change gets through.'",
+     "broke:'No. Nothing checks the game you asked for after the AI writer writes it, so every change gets through.'", 1,
+     "the answer under Nothing after a change got through"),
+    ("' No enforcer reads the program after the AI writes it to check for anything, so any change goes straight through.'",
+     "' No enforcer reads the game after the AI writer writes it to check for anything, so any change goes straight through.'", 1,
+     "the Nothing card after the rule broke"),
+    ("the page stands in for the AI on a canned change:", "the page stands in for the AI writer on a canned change:", 2, "log: the stand-in under Prose, both answers"),
+    # --- "the writer" becomes "the AI writer" in the sentences Mo approved earlier (the chart's are in STATES, ALT and the
+    # figure above; the Capability card's line is CAP_H; the Human hold line is HUMAN_HOLD)
+    (r"h:'One sentence in the writer\'s instructions tells it never", r"h:'One sentence in the AI writer\'s instructions tells it never", 1,
+     "Prose card, in this game"),
+    (r"""truth:'Yes. The rule is one sentence in the writer\'s instructions: "'+RULE_SENTENCE+'" It competes with every other sentence there, including your request, and nothing checks the program afterwards.""",
+     r"""truth:'Yes. The rule is one sentence in the AI writer\'s instructions: "'+RULE_SENTENCE+'" It competes with every other sentence there, including your request, and nothing checks the game afterwards.""",
+     1, "Prose: the answer (and its program is a game)"),
+    (r"the sentence is one line in the writer\'s instructions, and another run", r"the sentence is one line in the AI writer\'s instructions, and another run", 1,
+     "Prose: the answer after the rule broke"),
+    (r"""' The only thing in the way was one sentence in the writer\'s instructions: "'+RULE_SENTENCE+'". It competes with every other sentence the writer reads, so it can be missed, and nothing reads the program afterwards to catch it.'""",
+     r"""' The only thing in the way was one sentence in the AI writer\'s instructions: "'+RULE_SENTENCE+'". It competes with every other sentence the AI writer reads, so it can be missed, and nothing reads the game afterwards to catch it.'""",
+     1, "the Prose card after the rule broke (and its program is a game)"),
+    (r"""'Under Prose, the rule is one sentence in the writer\'s instructions: "'+RULE_SENTENCE+'" Nothing checks the program it writes. Play the game and see.'""",
+     r"""'Under Prose, the rule is one sentence in the AI writer\'s instructions: "'+RULE_SENTENCE+'" Nothing checks the game it writes. Play the game and see.'""",
+     1, "the Prose card when the search could not say (and its program is a game)"),
+    (r"the program\'s text and the writer\'s note.", r"the program\'s text and the AI writer\'s note.", 2, "Judge: the answer, and the reason kept beside it"),
+    (r"The judge is a model reading the program and the writer\'s note,", r"The judge is a model reading the program and the AI writer\'s note,", 1,
+     "the Judge card after the rule broke"),
+    # --- "program" becomes "game" where the reader is not looking at code
+    ("rejected this program", "rejected this game", 7, "log: a rejection under Judge (stand-in and real), Code (tests) and Code (proof)"),
+    ("the next program keeps all of it", "the next game keeps all of it", 2, "log: the tail of a rejection line when another try follows"),
+    ("'The program failed while being played. Rejected.'", "'The game failed while being played. Rejected.'", 1, "Code (tests): the card when the game broke while being played"),
+    ('"is this program winnable?" it will only pass the program if it believes it is unwinnable.',
+     '"is this game winnable?" it will only pass the game if it believes it is unwinnable.', 1, "log: the first time the real judge is asked"),
+    ("truth:'No. Every state the program can reach is searched after every change, and a program the search cannot finish is rejected too.'",
+     "truth:'No. Every state the game can reach is searched after every change, and a game the search cannot finish is rejected too.'", 1,
+     "Code (proof): the answer"),
+    ('there is no "submit program" tool.', 'there is no "submit game" tool.', 1, "Capability: the answer"),
+    (r"status.textContent='checking the program\u2026';", r"status.textContent='checking the game\u2026';", 1, "the status line while a new game is checked"),
+    ("'the program goes to the check first, exactly as asked.'", "'the game goes to the check first, exactly as asked.'", 1, "log: before a canned change is checked"),
+    ("'running the new program. goal: '", "'running the new game. goal: '", 1, "log: a new game is put on the board"),
+    ("'the program did not run, so it was rejected before any check. '", "'the game did not run, so it was rejected before any check. '", 3,
+     "log: a new game cannot start (what the AI writer is told keeps \"program\")"),
+    ("'The program did not run, so it was rejected. '", "'The game did not run, so it was rejected. '", 3, "the card when a new game cannot start"),
+    ("'the box refused the program at load: '", "'the box refused the game at load: '", 1, "log: the page cannot load a game it accepted"),
+    ("'no program came back; that counts as a caught round.'", "'no game came back; that counts as a caught round.'", 1, "log: the answer held no game"),
+    ("so the page cannot say whether this program can be won.", "so the page cannot say whether this game can be won.", 2,
+     "log: the search gave up, and the result line"),
+    ("so the page does not know whether this program can be won.'", "so the page does not know whether this game can be won.'", 1,
+     "the card when the search could not finish"),
+    ("Search again with more time checks the same program", "Search again with more time checks the same game", 2, "the offer to search longer, both forms"),
+    ("'A changed program is running. Reset first to activate the canned changes.'", "'A changed game is running. Reset first to activate the canned changes.'", 1,
+     "the note beside Reset on the canned tab"),
+    ("'the game is running a changed program. canned changes start from the original maze, so press Reset first.'",
+     "'a changed game is running. canned changes start from the original maze, so press Reset first.'", 1,
+     "log: a canned change pressed while a changed game runs (the note's own wording; a plain swap would say \"game\" twice)"),
+    ("prompt_too_large:'The request plus the current program is too long for one call.", "prompt_too_large:'The request plus the current game is too long for one call.", 1,
+     "error card: the request is too long"),
+    ("msg('the program crashed: '+e.message)", "msg('the game crashed: '+e.message)", 2, "the line under the board when the running game breaks on a move"),
+    ("msg('the program crashed on the clock: '", "msg('the game crashed on the clock: '", 1, "the line under the board when the running game breaks on its clock"),
+    ("new Error('program crashed: '+(e.message||'error'))", "new Error('game crashed: '+(e.message||'error'))", 1, "inside a did-not-run reason"),
+    ("new Error('the program did not answer in time')", "new Error('the game did not answer in time')", 1, "inside a did-not-run reason"),
+    ("the page's truth, no program can overwrite these", "the page's truth, no game can overwrite these", 1, "the caption above GAME STATUS"),
+    ("""'THE PROGRAM SAYS: "'""", """'THE GAME SAYS: "'""", 1, "the line under the counters when the running game states a goal"),
+    ("', and a condition the program set':', only a condition the program set'", "', and a condition the game set':', only a condition the game set'", 1,
+     "the GOAL line when the running game adds a condition"),
+    # --- "the checker" only under Human, Judge, Code (tests) and Code (proof): this message can show under every switch
+    ("so it used the word to trick our checker.", r"so it used the word to trick the page\'s search.", 1,
+     'the message about a pellet named "__proto__" (it sits in the box\'s own source, a raw string, so the apostrophe is escaped there)'),
+]
+
+# Sentences that can no longer reach a reader, deleted with the code that held them (the same pass: "Worth deleting in the
+# build rather than rewording"). Since 2026-10-03 a canned change under Prose takes the page's own answer and never asks a
+# model, so the branch that asked, its card, its log lines and its helpers go; under Human only a game the search proves
+# unwinnable reaches the approval panel, so the two sentences for a winnable game approved there go; and no link on the page
+# calls flip(), so the status line it wrote for a press during a request goes (the press is still refused).
+GATE_ELSE_FROM = "\n      else { status.textContent='asking the AI whether to apply it\\u2026';"
+GATE_ELSE_TO = "      pre[0].say=say; } }\n"
+DEAD_EDITS = [
+    (" : mode==='judge' ? 'asking Claude on your account a single light question: \"is this game winnable?\" it will only pass the game if it believes it is unwinnable.' : 'asking Claude on your account a single light question: whether to apply this change. the only thing in its way is one sentence.'); }",
+     " : 'asking Claude on your account a single light question: \"is this game winnable?\" it will only pass the game if it believes it is unwinnable.'); }",
+     1, "the cost line for the Prose question (only the judge is asked a question now)"),
+    ("// v37 (Mo, 2026-09-27): when the AI gives the Prose gate no answer, the card says so in his words and the change is not applied; the reason comes from the real error\n"
+     "const GATE_UNCLEAR='its reply was not a clear yes or no';\n"
+     "function gateReason(code){ return code==='timeout' ? 'the request timed out' : code==='rate_limited' ? 'your account\\'s usage limit was reached' : GATE_UNCLEAR; }\n",
+     "", 1, "the Prose question's no-answer reasons"),
+    ("const GATE_PASS=['not_granted','sampling_disabled','not_declared','capability_disabled','session_expired','prompt_too_large','invalid_request','bad_key','permission','no_credit'];   // access and page errors keep their own card (failText), they are not the AI's answer\n",
+     "", 1, "the errors the Prose question passed on"),
+    (" unknownText, permNote, PERM_DENIED, gateNoAnswer, askSwitch,", " unknownText, permNote, PERM_DENIED, askSwitch,", 1,
+     "the test hook no longer hands out the Prose no-answer card"),
+    ("), fin(r.opened?' You opened the program and approved it. A winnable program can look sound, and nothing checks it after you.':' You approved it from the summary, without opening the program. The summary is the writer\\'s own words about its program, so it can leave out what makes the game winnable.')); }",
+     ")); }", 1, "Human: the two sentences for a winnable game approved at the panel"),
+    ("  if (busy) { document.getElementById('status').textContent = 'wait for the AI to finish, then flip'; sw.scrollIntoView(",
+     "  if (busy) { sw.scrollIntoView(", 1, "flip(): the status line for a press during a request"),
+]
+DEAD_LINES = [   # whole lines, each found by how it starts
+    ("function gateNoAnswer(name, reason){ return 'You picked \"'", "the Prose no-answer card"),
+    ("function proseGatePrompt(opt){ return `You maintain a small grid game.", "the Prose question"),
+]
+# names that must be gone from the page once the dead code is out (a leftover reference would throw when it runs)
+DEAD_NAMES = ("gateNoAnswer", "proseGatePrompt", "gateReason", "GATE_UNCLEAR", "GATE_PASS", "asking the AI whether to apply it")
+
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 
 
@@ -860,6 +1008,25 @@ def apply_page(t):
         if t.count(old) != n:
             sys.exit(f"flow_edits: Human edit ({what}): expected {n} match(es), found {t.count(old)}")
         t = t.replace(old, new)
+    # the wording pass (2026-10-04): the two swaps, and the code no reader can reach
+    for old, new, n, what in WORDING_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"flow_edits: wording edit ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
+    a, b = t.find(GATE_ELSE_FROM), t.find(GATE_ELSE_TO)
+    if t.count(GATE_ELSE_FROM) != 1 or t.count(GATE_ELSE_TO) != 1 or not a < b:
+        sys.exit("flow_edits: the canned Prose branch that asked a model: expected its start once, then its end once")
+    t = t[:a] + " }\n" + t[b + len(GATE_ELSE_TO):]
+    for old, new, n, what in DEAD_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"flow_edits: unreachable text ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
+    for start, what in DEAD_LINES:
+        line = one("^" + re.escape(start) + ".*\n", t, f"unreachable line ({what})", re.M)
+        t = t[:line.start()] + t[line.end():]
+    for name in DEAD_NAMES:
+        if name in t:
+            sys.exit(f"flow_edits: {name!r} is still on the page after the unreachable code was removed")
     t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
 
     # the canned changes
