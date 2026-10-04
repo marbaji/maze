@@ -24,6 +24,10 @@ const POST_URL = 'https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-ins
 // are one plain double-quoted line (build/flow_edits.py, SOON_TEXT), so a reworded box is checked against the new words
 const SOON_SRC = fs.readFileSync(path.join(ROOT, 'build', 'flow_edits.py'), 'utf8').match(/^SOON_TEXT = "([^"\\\n]+)"$/m);
 const SOON_TEXT = SOON_SRC ? SOON_SRC[1] : null;
+// The words themselves are the claim: Mo wrote them and approved them for the live page (2026-10-04), so the test pins
+// them here, apart from the build source. A reworded box, in the build or on the page, fails until this line is changed
+// on purpose.
+const SOON_APPROVED = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time.";
 const KEY_IDS = ['read-play', 'keybox', 'keyinput', 'keysave', 'keystate', 'keymasked', 'forgetkey', 'keyerr', 'keyguide', 'capnote', 'q', 'send'];
 
 const failures = [];
@@ -60,6 +64,7 @@ async function structure(page, width) {
       introHref: introLink ? introLink.getAttribute('href') : null,
       soonCount: soon.length, soonInRead: read ? read.querySelectorAll(':scope > p.soon').length : 0,
       soonText: soon[0] ? soon[0].innerText.trim() : null, soonDrawn: soon[0] ? soon[0].getClientRects().length > 0 : false,
+      soonBox: soon[0] ? (() => { const c = getComputedStyle(soon[0]), pc = getComputedStyle(soon[0].previousElementSibling); const w = k => parseFloat(c[k]); return { top: w('borderTopWidth'), right: w('borderRightWidth'), bottom: w('borderBottomWidth'), left: w('borderLeftWidth'), bg: c.backgroundColor, sibBg: pc.backgroundColor }; })() : null,
       codedCount: coded.length, soonAfterCoded: coded.length === 1 && soonAt === kids.indexOf(coded[0]) + 1, soonAt, playAt,
       nav: q('nav').length, header: q('header').length, readOpen: q('#read-open').length, readLevers: q('#read-levers').length, byline: q('.byline').length,
       rule: q('p.rule').length, board: q('canvas#c').length, footer: q('footer').length,
@@ -86,6 +91,9 @@ async function structure(page, width) {
   check(s.soonCount === 1 && s.soonInRead === 1, `box about the tool: ${s.soonCount} on the page, ${s.soonInRead} directly in the intro, expected 1 and 1` + at);
   check(s.soonDrawn, 'box about the tool is not drawn' + at);
   check(s.soonText === SOON_TEXT, `box about the tool reads ${JSON.stringify(s.soonText)}, the build source says ${JSON.stringify(SOON_TEXT)}` + at);
+  check(s.soonText === SOON_APPROVED, `box about the tool reads ${JSON.stringify(s.soonText)}, which is not the approved wording` + at);
+  check(!!s.soonBox && s.soonBox.top > 0 && s.soonBox.right > 0 && s.soonBox.bottom > 0 && s.soonBox.left > s.soonBox.top, `box about the tool has no border on every side with a wider left edge (${JSON.stringify(s.soonBox)})` + at);
+  check(!!s.soonBox && s.soonBox.bg !== s.soonBox.sibBg, `box about the tool has the same background as the paragraph before it (${JSON.stringify(s.soonBox)})` + at);
   check(s.codedCount === 1, `paragraphs in the intro that say "I coded a game": ${s.codedCount}` + at);
   check(s.soonAfterCoded, 'box about the tool does not sit directly after the "I coded a game" paragraph' + at);
   check(s.soonAt >= 0 && s.playAt > s.soonAt, `box about the tool (child ${s.soonAt}) is not before the play heading (child ${s.playAt})` + at);

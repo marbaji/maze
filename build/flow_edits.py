@@ -95,7 +95,7 @@ INTRO_NEW = (
 # "Yes, move the if enough interest box to live page"). The words are his, verbatim. SOON_TEXT stays one plain
 # double-quoted line: tests/play-page-check.cjs reads it from this file and compares the page's box with it.
 SOON_TEXT = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will just make sure that what you want to happen actually happens, every time."
-SOON = f'  <p class="soon">{SOON_TEXT}</p>\n'
+SOON = f'  <p class="soon">{html.escape(SOON_TEXT, quote=False)}</p>\n'
 # the box sits directly after the intro's last paragraph, the one that ends with the link to the article, before the
 # game's heading
 SOON_AFTER = "I also wrote the article</a>.</p>\n"
