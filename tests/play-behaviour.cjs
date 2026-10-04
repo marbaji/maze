@@ -532,7 +532,7 @@ const INPUT = fs.readFileSync(path.join(ROOT, 'src', 'game.html'), 'utf8');
 // the text of one table of the source, from its opening line to its closing line; null unless both are there exactly once
 const tableBlock = (open, close) => { const a = INPUT.indexOf(open); if (a < 0 || INPUT.indexOf(open, a + 1) >= 0) return null; const b = INPUT.indexOf(close, a); return b < 0 ? null : INPUT.slice(a, b); };
 const QUICK_BLOCK = tableBlock('const QUICK = [\n', '\n];'), REPAIR_BLOCK = tableBlock('const REPAIR_WHY = {\n', '\n};');
-const quickRows = QUICK_BLOCK === null ? 0 : (QUICK_BLOCK.match(/^ \{id:'/gm) || []).length;   // the rows the table holds, counted apart from the read below
+const quickRows = QUICK_BLOCK === null ? 0 : QUICK_BLOCK.split('\n').slice(1).filter((l) => l.trim()).length;   // the rows the table holds: its lines, counted apart from the read below
 const quickWhys = QUICK_BLOCK === null ? [] : [...QUICK_BLOCK.matchAll(/\{id:'(\w+)', name:'([^']+)'[^\n]*?why:"((?:[^"\\]|\\.)*)"/g)].map((m) => ({ id: m[1], name: m[2], why: JSON.parse('"' + m[3] + '"') }));
 const repairWhy = (id) => { const m = REPAIR_BLOCK === null ? null : (REPAIR_BLOCK + '\n').match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
 // the premise of every case that uses the why lines: both tables were found, every row of QUICK was read, each once

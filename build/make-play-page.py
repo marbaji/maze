@@ -42,6 +42,8 @@ DEAD_NAMES = ("gateNoAnswer", "proseGatePrompt", "gateReason", "GATE_UNCLEAR", "
 SIM_KEEP = "the pellet walled in on the right side of the maze is closed in on all four sides, so no move ever lands on it"
 # the title is laid out as a ladder by a width measured in the title's own type for its last line: (last line, width)
 LADDER = ("Every Time", "4.78em")
+# the title the page's renderSeg() gives a switch that cannot be chosen
+OFF_TITLE = "not choosable: nobody trained a model about this game"
 # the first paint's card leaves out the clauses the page's posH() drops while the canned changes are hidden
 POSH_DROPS = ("the canned changes are disabled and ", "a canned change runs its repaired version, ")
 
@@ -64,12 +66,14 @@ def once(text, s, what):
 
 def field(row, name, mid, required=True):
     """The text of a single-quoted field of a MODES row, as the page would show it."""
-    m = re.search(r"[{,]" + name + r":'((?:[^'\\]|\\.)*)'", row)
-    if not m:
+    found = re.findall(r"[{,]" + name + r":'((?:[^'\\]|\\.)*)'", row)
+    if len(found) > 1:
+        fail(f"MODES row {mid} has {name} {len(found)} times; the page's script would use the last")
+    if not found:
         if required:
             fail(f"MODES row {mid} has no {name}")
         return None
-    return re.sub(r"\\(.)", r"\1", m.group(1))
+    return re.sub(r"\\(.)", r"\1", found[0])
 
 
 def check_sim(t):
@@ -81,10 +85,15 @@ def check_sim(t):
     once(t, "const QUICK = [\n", "QUICK table start")
     a = t.index("const QUICK = [\n")
     block = t[a:t.index("\n];", a)]
-    ids = re.findall(r"\{id:'(\w+)'", block)
-    whys = [json.loads('"' + w + '"') for w in re.findall(r'why:"((?:[^"\\]|\\.)*)"', block)]
-    if not ids or len(ids) != len(whys):
-        fail(f"QUICK: {len(ids)} entries but {len(whys)} why lines")
+    ids, whys = [], []
+    for line in (x for x in block.split("\n")[1:] if x.strip()):   # one canned change a line: its id and its one why line
+        i, w = re.findall(r"^ \{id:'(\w+)'", line), re.findall(r'[{,]\s*why:"((?:[^"\\]|\\.)*)"', line)
+        if len(i) != 1 or len(w) != 1:
+            fail(f"QUICK: every line must be one entry with its why line; this one has {len(i)} ids and {len(w)} why lines: {line[:60]}")
+        ids.append(i[0])
+        whys.append(json.loads('"' + w[0] + '"'))
+    if len(ids) < 2 or len(set(ids)) != len(ids):
+        fail(f"QUICK ids: {ids}")
     keeps = lambda w: w.startswith(SIM_KEEP + "; ") or w.startswith(SIM_KEEP + ". ")
     for i, w in zip(ids, whys):
         if w.startswith(sim_win) == keeps(w):
@@ -95,8 +104,9 @@ def check_sim(t):
     a = t.index("const REPAIR_WHY = {\n")
     body = t[a:t.index("\n};", a)]
     reps = re.findall(r'^ (\w+): "((?:[^"\\]|\\.)*)",$', body, flags=re.M)
-    if len(reps) != len(re.findall(r"^ (\w+):", body, flags=re.M)) or not reps:
-        fail("REPAIR_WHY: could not read every entry")
+    lines = [x for x in body.split("\n")[1:] if x.strip()]   # one repaired version a line, counted apart from the read
+    if not reps or len(reps) != len(lines):
+        fail(f"REPAIR_WHY: could not read every entry ({len(lines)} lines, {len(reps)} read)")
     for i, w in reps:
         if json.loads('"' + w + '"').startswith(sim_win):
             fail(f"REPAIR_WHY {i}: a repaired version reads as winnable")
@@ -116,7 +126,7 @@ def check_switch(t):
     if len(rows) < 2 or len(set(ids)) != len(ids):
         fail(f"MODES ids: {ids}")
     names = {mid: field(row, "name", mid) for mid, row in rows}
-    off = {mid for mid, row in rows if ",disabled:true," in row}
+    off = {mid for mid, row in rows if re.search(r",disabled:true[,}]", row)}
     arts = [field(row, "art", mid) for mid, row in rows]
     if len(set(arts)) != len(rows):
         fail(f"MODES rows must each have their own article anchor: {arts}")
@@ -136,7 +146,7 @@ def check_switch(t):
     if not counts:
         fail("the copy no longer says how many enforcers there are; drop this check if that is meant")
     if any(int(c) != len(rows) - 1 for c in counts):
-        fail(f"the copy counts {sorted(set(counts))} enforcers; MODES holds {len(rows) - 1} after the first position")
+        fail(f"the page says {sorted(set(counts))} enforcers or categories somewhere (copy or script); MODES holds {len(rows) - 1} after the first position")
 
     # the first paint of the switch: the rows' names in table order, one selected, the opening one
     seg = one(r'<div class="seg" id="seg">(.*?)</div>\n', t, "static switch").group(1)
@@ -151,6 +161,13 @@ def check_switch(t):
         fail(f"static switch: the one selected button must be {names[start]!r}")
     if {ids[i] for i, b in enumerate(buttons) if ' disabled=""' in b.split(">", 1)[0]} != off:
         fail("static switch: the buttons that cannot be chosen differ from MODES")
+    # each button whole, as the page's renderSeg() draws it: a row that cannot be chosen has its title and no line under its name
+    for (mid, row), b in zip(rows, buttons):
+        tag = (f'<button class="off" disabled="" title="{OFF_TITLE}">' if mid in off
+               else '<button class="on">' if mid == start else "<button>")
+        want = tag + f"<span>{names[mid]}</span>" + ("" if mid in off else f"<small>{field(row, 'sub', mid)}</small>") + "</button>"
+        if b != want:
+            fail(f"static switch: the {names[mid]!r} button reads {b}; MODES says {want}")
 
     # the first paint of the card, rebuilt from the opening row, and the result slot's badge
     h = field(srow, "h", start)

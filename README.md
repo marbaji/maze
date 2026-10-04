@@ -14,7 +14,7 @@ Use the "File a bug" button in the game, which opens a prefilled issue here, or 
 
 ## Rebuild and check
 
-The game is one file, `src/game.html`, and it is edited directly. `build/make-play-page.py` makes `index.html` from it by putting the key adapter, `src/byok.js`, where the source has a marker line, and it refuses to write a page that contradicts itself (for example a first screen that does not match the switch's table). `build/make-wip-page.py` then makes the preview, `wip.html` and `guide/wip.html`, which adds only its preview markers. After any change to the source, run both and commit the pages with it:
+The game is one file, `src/game.html`, and it is edited directly. `build/make-play-page.py` makes `index.html` from it by putting the key adapter, `src/byok.js`, where the source has a marker line, and it refuses to write a page that contradicts itself (for example a first screen that does not match the switch's table): it prints what disagrees, exits non-zero and writes nothing. `build/make-wip-page.py` then makes the preview, `wip.html` and `guide/wip.html`, which adds only its preview markers. After any change to the source, run both and commit the pages with it:
 
 ```
 python3 build/make-play-page.py
