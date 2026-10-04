@@ -954,6 +954,34 @@ DEAD_LINES = [   # whole lines, each found by how it starts
 # names that must be gone from the page once the dead code is out (a leftover reference would throw when it runs)
 DEAD_NAMES = ("gateNoAnswer", "proseGatePrompt", "gateReason", "GATE_UNCLEAR", "GATE_PASS", "asking the AI whether to apply it")
 
+# The round label (Mo, 2026-10-04): a typed request's cards open with "Round N." only while the request is still being
+# retried. The card a request ends on (accepted, broken, held, or a game that did not run under a switch that asks once)
+# carries no label; nor does the card after an approval under Human, the rare "The swapped program did not run." included.
+# One rule, in enforce(): a typed request's `how` IS its round label, so it is set aside as `label` and `how` is emptied;
+# every card built from `how` then has no label, and reject(), the one place a card of a round that will be retried is
+# made, puts the label back while another try follows (ctx.retry) and no approval was given. A canned pick's `how` ("You
+# picked ...") is not a round label and stays on every card. What is not a card keeps the label: the ledger, the judge's
+# prompt, the copied log, and the candidate a longer search resumes with.
+ROUND_EDITS = [
+    ("  const reject=(fb, why, kind)=>{ (ledgers[mode]=ledgers[mode]||[]).push({ask:ctx.ask, say:say||how, why:fb, src}); now.say=say; now.why=how+' '+why; now.whyLine=''; renderCard(); return {done:false, feedback:fb, kind:kind||'other'}; };\n",
+     "  const label=how, typed=ctx.from==='ai'; let approved=false; if(typed) how='';   // a typed request's `how` is its round label (\"Round N.\"): only the card of a round that will be retried carries it (Mo, 2026-10-04)\n"
+     "  const reject=(fb, why, kind)=>{ (ledgers[mode]=ledgers[mode]||[]).push({ask:ctx.ask, say:say||label, why:fb, src}); now.say=say; now.why=((typed&&(approved||!ctx.retry) ? '' : label)+' '+why).trim(); now.whyLine=''; renderCard(); return {done:false, feedback:fb, kind:kind||'other'}; };\n",
+     1, "enforce(): the round label is set aside, and only a rejected round that will be retried shows it"),
+    ("tried.push({how, mode, ask:ctx.ask||'', src});", "tried.push({how:label, mode, ask:ctx.ask||'', src});", 1, "the copied log keeps the label"),
+    ("const longer=est&&est.offer ? {src, say, how, why:ctx.whyLine,", "const longer=est&&est.offer ? {src, say, how:label, why:ctx.whyLine,", 1,
+     "the candidate a longer search resumes with keeps the label"),
+    ("sampleNs.json(judgePrompt(src, say||how),", "sampleNs.json(judgePrompt(src, say||label),", 1, "the judge's prompt is unchanged"),
+    ("const r=await askHuman(pv.unwinnable ? HUMAN_BAIT : (say||how), src, pv.unwinnable);", "const r=await askHuman(pv.unwinnable ? HUMAN_BAIT : (say||label), src, pv.unwinnable);", 1,
+     "the approval panel's fallback summary is unchanged"),
+    ("    const lead=ctx.from==='ai'?'':how, fin=(t)=>(lead+t).trim(); ctx.how=lead;   // after an approval the card drops the round prefix (Mo, 2026-10-03)\n",
+     "    approved=true; const fin=(t)=>(how+t).trim();   // after an approval no card carries the round label, a rejected swap's included (Mo, 2026-10-03 and 2026-10-04)\n",
+     1, "Human: the approval is told to reject(); its own prefix rule is the general one now"),
+    ("  const gone=()=>!!ctx&&ctx.reqId!==reqId;\n  let loaded; try{ loaded=await loadStaged(src); }",
+     "  const gone=()=>!!ctx&&ctx.reqId!==reqId; why=String(why||'').trim(); if(fellWhy) fellWhy=String(fellWhy).trim();   // a typed request's card has no opening words (no round label on a final card), so the sentences that follow them start the card\n  let loaded; try{ loaded=await loadStaged(src); }",
+     1, "accept(): the card's sentences without opening words"),
+    ("  quizState='ask'; renderSeg(); renderCard(); return {done:true};\n}\nconst APPLIES=", "  now.why=now.why.trim(); quizState='ask'; renderSeg(); renderCard(); return {done:true};\n}\nconst APPLIES=", 1,
+     "accept(): a card that starts with the page's own sentence has no leading space"),
+]
 CSS_CAP = ".capnote{border:2px solid var(--sticky);border-radius:8px;padding:10px 12px;font:500 14px/1.45 var(--sans);color:var(--ink);background:var(--paper);margin:0 0 10px}\n"
 
 
@@ -1008,7 +1036,7 @@ def apply_page(t):
         if t.count(old) != n:
             sys.exit(f"flow_edits: Human edit ({what}): expected {n} match(es), found {t.count(old)}")
         t = t.replace(old, new)
-    # the wording pass (2026-10-04): the two swaps, and the code no reader can reach
+    # the wording pass (2026-10-04): the two swaps, the code no reader can reach, and the round label
     for old, new, n, what in WORDING_EDITS:
         if t.count(old) != n:
             sys.exit(f"flow_edits: wording edit ({what}): expected {n} match(es), found {t.count(old)}")
@@ -1027,6 +1055,10 @@ def apply_page(t):
     for name in DEAD_NAMES:
         if name in t:
             sys.exit(f"flow_edits: {name!r} is still on the page after the unreachable code was removed")
+    for old, new, n, what in ROUND_EDITS:
+        if t.count(old) != n:
+            sys.exit(f"flow_edits: round label ({what}): expected {n} match(es), found {t.count(old)}")
+        t = t.replace(old, new)
     t = once(t, FOOT_OLD, FOOT_NEW, "footer sentence")
 
     # the canned changes

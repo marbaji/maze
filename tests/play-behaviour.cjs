@@ -1131,7 +1131,8 @@ async function case20() {
   }
 }
 
-// ---- the wording pass (Mo, 2026-10-04): one name for the model that writes a new game, "the AI writer"
+// ---- the wording pass (Mo, 2026-10-04): one name for the model that writes a new game, "the AI writer", and no round label on the card a
+// typed request ends on
 const BARE_WRITER = /(?<!AI )\bthe writer/i;   // "the writer" that is not "the AI writer"
 const BARE_WRITER_SEEN = /(?<!AI )\bwriter/i;   // in what a reader sees, the word never stands without "AI" at all ("AI writer: ..." in the log)
 async function case22() {
@@ -1160,6 +1161,73 @@ async function case22() {
     }
   }
   check(labelled === names.length, `case 22: premise: the chart labels its second box "The AI writer" under ${labelled} of ${names.length} switches`);
+  await context.close();
+}
+
+async function case23() {
+  // the round label: a typed request's card opens with "Round N." only while the request is still being retried. The card it ends on has
+  // none, under switches that ask once (Nothing, Prose, Construction: an accepted game, and a game that did not run) and under switches
+  // that retry (Code (proof), Judge: the first answer is rejected and its card carries the label; the second is accepted and its card
+  // does not). Premises: the label was made (the copied log names each tried game by it), and each run made the calls it should
+  const ROUND = /Round \d+\./;
+  const norun = pageLits(/'\. Fix that first\.', (LIT)\+chk\.error\+'\.', 'failed'\)/), rewriting = pageLits(/'round '\+label\+(LIT)\)/);
+  check(norun && rewriting, 'case 23: premise: the page has the did-not-run card and the line it logs when a later try starts');
+  if (!norun || !rewriting) return;
+  const [NORUN_CARD] = norun, [REWRITING] = rewriting;
+  const { context, page } = await open({ name: 'case 23', hash: '?mock' });
+  await mockReady(page);
+  const busyEnd = (what) => until(() => page.evaluate(() => !window.__nrp.busy()), 90000, what);
+  const writes = () => page.evaluate(() => window.__mock.tiers.filter((x) => x.kind === 'write').length);
+  const tried = () => page.evaluate(() => (window.__nrp.logText().match(/^==== program \d+ of \d+: (.*?) \[/gm) || []));
+  const fresh = async (mode, what) => { await page.evaluate(() => window.__nrp.resetGame()); await busyEnd(what + ' reset');
+    await page.evaluate((m) => { const k = window.__mock; k.delay = 30; k.repairs = true; k.model = null; k.program = null; k.judge = 'unwinnable'; k.judgeQueue = null; document.getElementById('clearlog').click(); window.__nrp.setMode(m); }, mode); };
+  let seenText = '';
+  const note = async () => { seenText += '\n' + await page.evaluate(() => document.body.innerText); };
+
+  // switches that ask once: the card the request ends on
+  for (const mode of ['nothing', 'prose', 'construction']) {
+    for (const how of ['accepted', 'did not run']) {
+      const at = `case 23 (${mode}, ${how})`;
+      await fresh(mode, at);
+      if (how === 'did not run') await page.evaluate(() => { window.__mock.program = 'function init( {'; });
+      const w0 = await writes();
+      await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+      await sleep(100); await busyEnd(at); await sleep(200);
+      const c = await resultCard(page), t = await tried();
+      await note();
+      check((await writes()) - w0 === 1, `${at}: premise: one writer call (got ${(await writes()) - w0})`);
+      check(t.length === 1 && ROUND.test(t[0]), `${at}: premise: the copied log names the game by its round label (${JSON.stringify(t)})`);
+      if (how === 'accepted') check(/^RULE /.test(c.st) && c.why.length > 0, `${at}: premise: the request ended on a verdict with a sentence (${c.st}: ${JSON.stringify(c.why.slice(0, 80))})`);
+      else check(c.why.includes(NORUN_CARD), `${at}: premise: the request ended on the did-not-run card (${JSON.stringify(c.why.slice(0, 120))})`);
+      check(!ROUND.test(c.why), `${at}: the final card carries a round label (${JSON.stringify(c.why.slice(0, 120))})`);
+    }
+  }
+
+  // switches that retry: the rejected first answer's card carries the label while the second try runs; the accepted second answer's does not
+  for (const mode of ['proof', 'judge']) {
+    const at = `case 23 (${mode}, retried)`;
+    await fresh(mode, at);
+    await page.evaluate((m) => { window.__mock.delay = 500; if (m === 'judge') window.__mock.judgeQueue = ['winnable', 'unwinnable']; }, mode);
+    const w0 = await writes(); let mid = null;
+    await page.evaluate(() => { window.__nrp.request('open the pocket', {}); });
+    await until(async () => {
+      const s = await page.evaluate((R) => ({ busy: window.__nrp.busy(), second: [...document.querySelectorAll('#log .l')].some((d) => /^round 2 of \d+/.test(d.textContent) && d.textContent.endsWith(R)), done: [...document.querySelectorAll('#log .l')].some((d) => /^result: /.test(d.textContent)) }), REWRITING);
+      if (!mid && s.busy && s.second && !s.done) mid = (await resultCard(page)).why;
+      return !s.busy && s.done;
+    }, 120000, at);
+    await sleep(200);
+    const c = await resultCard(page), t = await tried();
+    await note();
+    check((await writes()) - w0 === 2, `${at}: premise: two writer calls, the rejected one and the accepted one (got ${(await writes()) - w0})`);
+    check(t.length === 2 && t.every((x) => ROUND.test(x)), `${at}: premise: the copied log names both games by their round labels (${JSON.stringify(t)})`);
+    check(typeof mid === 'string' && /^Round 1\. \S/.test(mid), `${at}: the card of the rejected first try, while the second runs, opens with its round label (${JSON.stringify(mid)})`);
+    check(c.st === 'RULE HELD' && c.why.length > 0, `${at}: premise: the second answer was accepted (${c.st}: ${JSON.stringify(c.why.slice(0, 80))})`);
+    check(!ROUND.test(c.why), `${at}: the final card carries a round label (${JSON.stringify(c.why.slice(0, 120))})`);
+  }
+  // what these runs put on the page (cards, log, status) never says "writer" without "AI"; premise: they did name the AI writer
+  const bare = seenText.search(BARE_WRITER_SEEN);
+  check(/the AI writer/.test(seenText), 'case 23: premise: the runs wrote "the AI writer" on the page');
+  check(bare < 0, `case 23: the page says "writer" without "AI": ...${seenText.slice(Math.max(0, bare - 60), bare + 40)}...`);
   await context.close();
 }
 
@@ -1194,7 +1262,7 @@ async function case9() {
     await until(async () => { try { return (await fetch(ORIGIN + '/' + PAGE)).ok; } catch (e) { return false; } }, 10000, 'the http server');
     browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
     const only = process.env.CASES ? process.env.CASES.split(',') : null;
-    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['22', case22], ['9', case9]];   // 9 last: it reads every request the others made
+    const cases = [['1', case1], ['2', case2], ['3', case3], ['4', case4], ['5', case5], ['6', case6], ['7', case7], ['7b', case7b], ['8', case8], ['10', case10], ['11', case11], ['12', case12], ['13', case13], ['14', case14], ['15', case15], ['16', case16], ['17', case17], ['18', case18], ['19', case19], ['20', case20], ['21', case21], ['22', case22], ['23', case23], ['9', case9]];   // 9 last: it reads every request the others made
     for (const [n, fn] of cases) {
       if (only && !only.includes(n)) continue;
       const before = failures.length;
