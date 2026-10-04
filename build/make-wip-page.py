@@ -8,9 +8,8 @@ The flow-chart round went live on 2026-10-03: its changes now live in build/flow
 applies to index.html. What is left here is only what marks the preview as a preview: "(preview)" in the page's title
 and the guide's, a noindex meta on both, the note at the top of the article (which links to the live game and gives the
 word count of the text above the game), and the preview's own copy of the key guide, linked from the key box and
-linking back to wip.html. One change is previewed here that the owner has not approved for the live page yet: a bordered
-box in the intro about a tool he may release (see SOON below). A later round starts its changes here and moves them into flow_edits.py (or a module like it)
-when it goes live. index.html, the live page, is not changed by this script.
+linking back to wip.html. A later round starts its changes here and moves them into flow_edits.py (or a module like it)
+when it goes live (the last to do so: the bordered box in the intro about a tool the owner may release, 2026-10-04). index.html, the live page, is not changed by this script.
 
 Every edit is anchored on an exact string or pattern of index.html (or guide/index.html) and must match exactly once,
 or the script exits non-zero and writes nothing (the previous wip.html, if any, is left as it was, so gate a commit on
@@ -35,21 +34,8 @@ WIPNOTE = ('  <p class="wipnote">Work-in-progress preview. The live game is <a h
 # the note sits at the top of the article, before the intro's first paragraph
 WIPNOTE_BEFORE = "  <p>We've all been there."
 WIPNOTE_CSS = ".wipnote{font:600 13px/1.4 var(--sans);color:var(--ink-2);border:1px dashed var(--line);border-radius:8px;padding:8px 12px}\n"
-# the note's style goes first among the flow-chart round's lines in the page's stylesheet
+# the note's style goes just before this line of the flow-chart round's in the page's stylesheet
 WIPNOTE_CSS_BEFORE = ".card.pos .h+.h{margin-top:8px}\n"
-
-# PREVIEW OF A CHANGE THE OWNER HAS NOT APPROVED FOR THE LIVE PAGE YET: a bordered box in the intro, above the game,
-# about a tool he may release (Mo, 2026-10-03: "probably we should mention the 'If there's enough interest in this,' in
-# like a bordered box or indented box inside the intro narrative somewhere in the /maze artifact so ppl who land there
-# can find it"). The words are his, verbatim. If he approves it, it moves into build/flow_edits.py and leaves this file.
-SOON = ("  <p class=\"soon\">If there's enough interest in this, I will release a tool that takes in your AI skill file, "
-        "breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces "
-        "into a fully executable program that runs as one automated workflow. This tool won't make up new rules. It will "
-        "just make sure that what you want to happen actually happens, every time.</p>\n")
-# the box sits directly after the paragraph that ends with the link to the article, before the game's heading
-SOON_AFTER = "I also wrote the article</a>.</p>\n"
-# a quiet box in the page's own colours (they switch with light and dark); the text keeps the article's body type
-SOON_CSS = ".read .soon{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:8px;padding:12px 14px;background:var(--card)}\n"
 
 
 def once(text, old, new, what):
@@ -61,10 +47,6 @@ def once(text, old, new, what):
 
 def main():
     t = SRC.read_text(encoding="utf-8")
-
-    # the previewed box goes in first, so that the word count below includes it
-    t = once(t, SOON_AFTER, SOON_AFTER + SOON, "box about the tool")
-    t = once(t, WIPNOTE_CSS_BEFORE, SOON_CSS + WIPNOTE_CSS_BEFORE, "box's style")
 
     # the words a reader meets before the game: the article's text, before the preview note that reports the number
     m = re.findall(r'<article id="read" class="read">\n(.*?)</article>', t, re.S)

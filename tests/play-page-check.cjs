@@ -20,6 +20,10 @@ const PLAY_HEAD = 'The Unwinnable Maze';
 const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src https://api.anthropic.com";
 const POST_URL = 'https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281';
+// the bordered box in the intro about a tool the owner may release: its words are read from the build source, where they
+// are one plain double-quoted line (build/flow_edits.py, SOON_TEXT), so a reworded box is checked against the new words
+const SOON_SRC = fs.readFileSync(path.join(ROOT, 'build', 'flow_edits.py'), 'utf8').match(/^SOON_TEXT = "([^"\\\n]+)"$/m);
+const SOON_TEXT = SOON_SRC ? SOON_SRC[1] : null;
 const KEY_IDS = ['read-play', 'keybox', 'keyinput', 'keysave', 'keystate', 'keymasked', 'forgetkey', 'keyerr', 'keyguide', 'capnote', 'q', 'send'];
 
 const failures = [];
@@ -40,6 +44,10 @@ async function structure(page, width) {
     const read = document.getElementById('read');
     const introLink = read && read.querySelector('p:not(.wipnote) a[href]');
     const masked = document.getElementById('keymasked');
+    // the box about the tool: where it sits among the article's children, between the paragraph that says "I coded a game" and the play heading
+    const soon = q('.soon'), kids = read ? [...read.children] : [];
+    const coded = kids.filter((el) => el.tagName === 'P' && el.innerText.includes('I coded a game'));
+    const soonAt = kids.indexOf(soon[0]), playAt = kids.indexOf(document.getElementById('read-play'));
     const csp = q('meta[http-equiv="Content-Security-Policy"]');
     const off = [];
     for (const el of q('script[src]')) if (new URL(el.getAttribute('src'), location.href).origin !== location.origin) off.push(el.outerHTML.slice(0, 120));
@@ -50,6 +58,9 @@ async function structure(page, width) {
       h1BeforePlay: !!(h1[0] && document.getElementById('read-play') && (h1[0].compareDocumentPosition(document.getElementById('read-play')) & Node.DOCUMENT_POSITION_FOLLOWING)),
       playText: document.getElementById('read-play') ? document.getElementById('read-play').textContent.trim() : null,
       introHref: introLink ? introLink.getAttribute('href') : null,
+      soonCount: soon.length, soonInRead: read ? read.querySelectorAll(':scope > p.soon').length : 0,
+      soonText: soon[0] ? soon[0].innerText.trim() : null, soonDrawn: soon[0] ? soon[0].getClientRects().length > 0 : false,
+      codedCount: coded.length, soonAfterCoded: coded.length === 1 && soonAt === kids.indexOf(coded[0]) + 1, soonAt, playAt,
       nav: q('nav').length, header: q('header').length, readOpen: q('#read-open').length, readLevers: q('#read-levers').length, byline: q('.byline').length,
       rule: q('p.rule').length, board: q('canvas#c').length, footer: q('footer').length,
       missing: KEY_IDS.filter((id) => !document.getElementById(id)),
@@ -71,6 +82,13 @@ async function structure(page, width) {
   check(s.h1BeforePlay, 'h1 is not before #read-play' + at);
   check(s.playText === PLAY_HEAD, `#read-play text ${JSON.stringify(s.playText)}` + at);
   check(s.introHref === POST_URL, `intro link href ${JSON.stringify(s.introHref)}` + at);
+  check(SOON_TEXT !== null && SOON_TEXT.length > 0, 'build/flow_edits.py does not hold SOON_TEXT as one plain double-quoted line' + at);
+  check(s.soonCount === 1 && s.soonInRead === 1, `box about the tool: ${s.soonCount} on the page, ${s.soonInRead} directly in the intro, expected 1 and 1` + at);
+  check(s.soonDrawn, 'box about the tool is not drawn' + at);
+  check(s.soonText === SOON_TEXT, `box about the tool reads ${JSON.stringify(s.soonText)}, the build source says ${JSON.stringify(SOON_TEXT)}` + at);
+  check(s.codedCount === 1, `paragraphs in the intro that say "I coded a game": ${s.codedCount}` + at);
+  check(s.soonAfterCoded, 'box about the tool does not sit directly after the "I coded a game" paragraph' + at);
+  check(s.soonAt >= 0 && s.playAt > s.soonAt, `box about the tool (child ${s.soonAt}) is not before the play heading (child ${s.playAt})` + at);
   for (const k of ['nav', 'header', 'readOpen', 'readLevers', 'byline']) check(s[k] === 0, `${k} present (${s[k]})` + at);
   for (const k of ['rule', 'board', 'footer']) check(s[k] === 1, `${k} count ${s[k]}` + at);
   check(s.missing.length === 0, `missing ids: ${s.missing.join(', ')}` + at);
