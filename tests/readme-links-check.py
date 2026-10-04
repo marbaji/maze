@@ -16,10 +16,10 @@ LINK = re.compile(r"https://github\.com/marbaji/maze/blob/main/([^\s)#]+)#L(\d+)
 CLAIMS = [
     ("src/byok.js", ["clean(key)"]),                                   # the page trims the key
     ("src/byok.js", ["doFetch(API", "'x-api-key': k"]),                 # sent only in the x-api-key header to the API
-    ("build/make-play-page.py", ["sessionStorage.getItem", "sessionStorage.setItem", "sessionStorage.removeItem"]),  # kept in sessionStorage
-    ("build/make-play-page.py", ["function forget()", "halt()", "drop()"]),  # Forget key removes it and stops calls in flight
-    ("build/make-play-page.py", ["$('forgetkey').addEventListener"]),  # the button is wired to forget()
-    ("build/make-play-page.py", ["connect-src https://api.anthropic.com"]),  # the CSP
+    ("src/game.html", ["sessionStorage.getItem", "sessionStorage.setItem", "sessionStorage.removeItem"]),  # kept in sessionStorage
+    ("src/game.html", ["function forget()", "halt()", "drop()"]),  # Forget key removes it and stops calls in flight
+    ("src/game.html", ["$('forgetkey').addEventListener"]),  # the button is wired to forget()
+    ("src/game.html", ["<!doctype html><html><head><meta http-equiv=\"Content-Security-Policy\"", "connect-src https://api.anthropic.com"]),  # the CSP
 ]
 
 

@@ -527,13 +527,18 @@ async function case11() {
 }
 
 // ---- no key: the simulated Judge and Prose answers. The expected texts are Mo's approved wording (the claim itself); the why lines and the
-// winnable split come from the build input, read here independently of the page's own derivation
-const INPUT = fs.readFileSync(path.join(ROOT, 'build', 'input', 'game-public.html'), 'utf8');
-const quickWhys = (() => {
-  const a = INPUT.indexOf('const QUICK = [\n'), block = INPUT.slice(a, INPUT.indexOf('\n];', a));
-  return [...block.matchAll(/\{id:'(\w+)', name:'([^']+)'[^\n]*?why:"((?:[^"\\]|\\.)*)"/g)].map((m) => ({ id: m[1], name: m[2], why: JSON.parse('"' + m[3] + '"') }));
-})();
-const repairWhy = (id) => { const m = INPUT.match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
+// winnable split come from the page's source (src/game.html), read here as text, independently of the page's own derivation
+const INPUT = fs.readFileSync(path.join(ROOT, 'src', 'game.html'), 'utf8');
+// the text of one table of the source, from its opening line to its closing line; null unless both are there exactly once
+const tableBlock = (open, close) => { const a = INPUT.indexOf(open); if (a < 0 || INPUT.indexOf(open, a + 1) >= 0) return null; const b = INPUT.indexOf(close, a); return b < 0 ? null : INPUT.slice(a, b); };
+const QUICK_BLOCK = tableBlock('const QUICK = [\n', '\n];'), REPAIR_BLOCK = tableBlock('const REPAIR_WHY = {\n', '\n};');
+const quickRows = QUICK_BLOCK === null ? 0 : QUICK_BLOCK.split('\n').slice(1).filter((l) => l.trim()).length;   // the rows the table holds: its lines, counted apart from the read below
+const quickWhys = QUICK_BLOCK === null ? [] : [...QUICK_BLOCK.matchAll(/\{id:'(\w+)', name:'([^']+)'[^\n]*?why:"((?:[^"\\]|\\.)*)"/g)].map((m) => ({ id: m[1], name: m[2], why: JSON.parse('"' + m[3] + '"') }));
+const repairWhy = (id) => { const m = REPAIR_BLOCK === null ? null : (REPAIR_BLOCK + '\n').match(new RegExp('\\n ' + id + ': "((?:[^"\\\\]|\\\\.)*)",\\n')); return m && JSON.parse('"' + m[1] + '"'); };
+// the premise of every case that uses the why lines: both tables were found, every row of QUICK was read, each once
+const whyPremise = () => QUICK_BLOCK === null ? 'the QUICK table was not found once in src/game.html' : REPAIR_BLOCK === null ? 'the REPAIR_WHY table was not found once in src/game.html'
+  : quickRows < 2 || quickWhys.length !== quickRows ? `QUICK holds ${quickRows} rows and ${quickWhys.length} were read`
+  : new Set(quickWhys.map((e) => e.id)).size !== quickWhys.length ? 'QUICK ids repeat' : '';
 // a why line as the page quotes it: its closing full stop dropped, and a winnable one without its "this version can be won: " opening
 const q = (why) => why.replace(/\.$/, '').replace(/^this version can be won: /, '');
 const SIM = {
@@ -543,7 +548,8 @@ const SIM = {
 };
 async function case12() {
   const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
-  check(quickWhys.length >= 2 && win && keep && repairWhy(win.id), `case 12: premise: could not read a winnable and an unwinnable change from QUICK (${quickWhys.length} read)`);
+  check(whyPremise() === '', `case 12: premise: ${whyPremise()}`);
+  check(win && keep && repairWhy(win.id), `case 12: premise: could not read a winnable change with its repaired why line, and an unwinnable change, from QUICK (${quickWhys.length} read)`);
   if (!win || !keep) return;
   // the two log lines these checks turn on, read from the page so a reworded line is followed: what the page logs when a new game is put
   // on the board, and what it logs before a canned change goes to the check
@@ -640,7 +646,7 @@ const mockReady = (page) => until(() => page.evaluate(() => !!(window.__nrp && w
 async function case13() {
   // a canned change never calls a model under Prose or Judge, with a key saved: the page's own answer is used
   const win = quickWhys.find((e) => /^this version can be won/.test(e.why)), keep = quickWhys.find((e) => !/^this version can be won/.test(e.why));
-  check(win && keep, 'case 13: premise: a winnable and an unwinnable canned change');
+  check(whyPremise() === '' && win && keep, `case 13: premise: a winnable and an unwinnable canned change (${whyPremise()})`);
   if (!win || !keep) return;
   for (const mode of ['Prose', 'Judge']) {
     const at = `case 13 (${mode}, key saved)`;
