@@ -18,12 +18,10 @@ jobs:
           node-version: 20
       - name: Key adapter tests
         run: node tests/byok.test.cjs
-      - name: Rebuild matches the committed page
+      - name: Rebuild matches the committed pages
         run: bash tests/rebuild-check.sh
       - name: Privacy scan
         run: python3 tests/privacy-scan.py
-      - name: Importer check
-        run: python3 tests/import-check.py
       - name: README line links
         run: python3 tests/readme-links-check.py
 

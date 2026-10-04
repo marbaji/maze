@@ -20,13 +20,9 @@ const PLAY_HEAD = 'The Unwinnable Maze';
 const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src https://api.anthropic.com";
 const POST_URL = 'https://blog.mohannadarbaji.com/how-to-make-ai-follow-your-instructions-every-time-16a75f58f281';
-// the bordered box in the intro about a tool the owner may release: its words are read from the build source, where they
-// are one plain double-quoted line (build/flow_edits.py, SOON_TEXT), so a reworded box is checked against the new words
-const SOON_SRC = fs.readFileSync(path.join(ROOT, 'build', 'flow_edits.py'), 'utf8').match(/^SOON_TEXT = "([^"\\\n]+)"$/m);
-const SOON_TEXT = SOON_SRC ? SOON_SRC[1] : null;
-// The words themselves are the claim: Mo wrote them and approved them for the live page (2026-10-04), so the test pins
-// them here, apart from the build source. A reworded box, in the build or on the page, fails until this line is changed
-// on purpose.
+// the bordered box in the intro about a tool the owner may release. The words themselves are the claim: Mo wrote them and
+// approved them for the live page (2026-10-04), so the test pins them here, apart from the page's source (src/game.html).
+// A reworded box fails until this line is changed on purpose.
 const SOON_APPROVED = "If there's enough interest in this, I will release a tool that takes in your AI skill file, breaks it into smaller pieces, and gives each piece the strongest enforcer that fits it. It then turns the pieces into a fully executable program that runs as one automated workflow. What this does is ensure that every step you write in your skill file will actually happen every single time you run it, without adding any rules of its own. This is especially helpful when:";
 const SOON_APPROVED_BULLETS = ["The skill runs overnight or on a schedule, where a skipped step isn't noticed until the damage is done.", "A step in the skill can't be undone. Sending, publishing, deleting, paying.", "Other people run it. A teammate who didn't write the skill can't tell what it skipped.", "The skill runs many times. A step skipped one time in twenty is a near certainty over a hundred runs."];   // the four cases under it, approved with it (2026-10-04)
 const KEY_IDS = ['read-play', 'keybox', 'keyinput', 'keysave', 'keystate', 'keymasked', 'forgetkey', 'keyerr', 'keyguide', 'capnote', 'q', 'send'];
@@ -90,10 +86,8 @@ async function structure(page, width) {
   check(s.h1BeforePlay, 'h1 is not before #read-play' + at);
   check(s.playText === PLAY_HEAD, `#read-play text ${JSON.stringify(s.playText)}` + at);
   check(s.introHref === POST_URL, `intro link href ${JSON.stringify(s.introHref)}` + at);
-  check(SOON_TEXT !== null && SOON_TEXT.length > 0, 'build/flow_edits.py does not hold SOON_TEXT as one plain double-quoted line' + at);
   check(s.soonCount === 1 && s.soonInRead === 1, `box about the tool: ${s.soonCount} on the page, ${s.soonInRead} directly in the intro, expected 1 and 1` + at);
   check(s.soonDrawn, 'box about the tool is not drawn' + at);
-  check(s.soonText === SOON_TEXT, `box about the tool reads ${JSON.stringify(s.soonText)}, the build source says ${JSON.stringify(SOON_TEXT)}` + at);
   check(s.soonText === SOON_APPROVED, `box about the tool reads ${JSON.stringify(s.soonText)}, which is not the approved wording` + at);
   check(JSON.stringify(s.soonBullets) === JSON.stringify(SOON_APPROVED_BULLETS), `box about the tool lists ${JSON.stringify(s.soonBullets)}, which is not the approved four cases` + at);
   check(s.soonAll === [SOON_APPROVED].concat(SOON_APPROVED_BULLETS).join(' '), `box about the tool holds more or less than the approved paragraph and its four cases: ${JSON.stringify(s.soonAll)}` + at);
