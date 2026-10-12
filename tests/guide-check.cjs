@@ -1,6 +1,6 @@
 'use strict';
 // The picture guide to getting a key: node tests/guide-check.cjs [guide] [game]   (relative to the repo root; default guide/ and index.html,
-// the live pages; guide/wip.html and wip.html are the preview's)
+// the live pages)
 // Serves the repo with python3 -m http.server 8765 and loads the guide in Chromium at 1280x900 and 390x844, light and dark.
 // PLAYWRIGHT_PATH (optional) points at a playwright install; CHROME (optional) at a Chromium binary.
 const fs = require('fs');
@@ -12,11 +12,9 @@ const ROOT = path.resolve(__dirname, '..');
 const PORT = 8765, ORIGIN = `http://127.0.0.1:${PORT}`;
 const GUIDE_PATH = process.argv[2] || 'guide/', GAME = process.argv[3] || 'index.html';
 const GUIDE = `${ORIGIN}/${GUIDE_PATH}`;
-// the preview's guide differs from the live one only in "(preview)" in its title, a noindex meta, and links back to the preview's game
-const PREVIEW = /wip\.html$/.test(GUIDE_PATH);
-const TITLE = 'Get a key for the maze' + (PREVIEW ? ' (preview)' : '');
-const BACK = PREVIEW ? '../wip.html#read-play' : '../#read-play';
-const GUIDE_HREF = PREVIEW ? 'guide/wip.html' : 'guide/';
+const TITLE = 'Get a key for the maze';
+const BACK = '../#read-play';
+const GUIDE_HREF = 'guide/';
 
 const failures = [];
 const check = (ok, what) => { if (!ok) failures.push(what); };
