@@ -9,11 +9,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
 const ROOT = path.resolve(__dirname, '..');
 const FILE = process.argv[2] || 'index.html';
-// the preview (wip.html, made by build/make-wip-page.py from index.html) differs from the live page only in its preview markers: "(preview)"
-// in the title, a note at the top of the article that links to the live game, and its own copy of the key guide
-const PREVIEW = /(^|\/)wip\.html$/.test(FILE);
-const TITLE = 'Unwinnable Maze' + (PREVIEW ? ' (preview)' : '');
-const GUIDE_HREF = PREVIEW ? 'guide/wip.html' : 'guide/';
+const TITLE = 'Unwinnable Maze';
+const GUIDE_HREF = 'guide/';
 // the laddered title and the play heading (Mo, 2026-10-02)
 const H1 = 'How To Make AI Follow Your Instructions, Every Time';
 const PLAY_HEAD = 'The Unwinnable Maze';
@@ -43,7 +40,7 @@ async function structure(page, width) {
     const q = (sel) => document.querySelectorAll(sel);
     const h1 = q('h1');
     const read = document.getElementById('read');
-    const introLink = read && read.querySelector('p:not(.wipnote) a[href]');
+    const introLink = read && read.querySelector('p a[href]');
     const masked = document.getElementById('keymasked');
     // the box about the tool: where it sits among the article's children, between the paragraph that says "I coded a game" and the play heading
     const soon = q('.soon'), kids = read ? [...read.children] : [];

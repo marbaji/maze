@@ -1,6 +1,6 @@
 'use strict';
 // Behaviour tests of the play page, with no real key; ?mock only where a case says so.
-//   node tests/play-behaviour.cjs [page]   (page relative to the repo root; default index.html, the live page; wip.html is the preview)
+//   node tests/play-behaviour.cjs [page]   (page relative to the repo root; default index.html, the live page)
 // Two transports: page.route() fulfils complete Anthropic answers; a small Node streaming server on 127.0.0.1:8766 holds a stream open
 // (Stop, Forget, timeouts). The streaming cases load a TEST COPY of the page, with the adapter's API constant, the CSP connect-src and the
 // judge timeout pointed at the test; the shipped page is never changed and has no URL override. The static server serves a temporary folder
